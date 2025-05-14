@@ -6,9 +6,9 @@ import time
 # Configuration
 symbol = 'BTC/USDT'
 timeframe = '1h'  # 1 hour
-since_datetime_str = '2022-01-01T00:00:00Z'
+since_datetime_str = '2017-01-01T00:00:00Z'
 to_datetime_str = '2025-01-01T00:00:00Z' # Note: Binance might not have data up to 2025 yet.
-output_csv_file = 'btc_hourly_data_2022_2025.csv'
+output_csv_file = 'btc_hourly_data_2017_2025.csv'
 exchange_id = 'binance'
 
 # Initialize exchange

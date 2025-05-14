@@ -1,6 +1,6 @@
 import csv
 
-input_csv_file = '/Users/melihkarakose/Desktop/EC 581/btc_hourly_data_2022_2025.csv'
+input_csv_file = '/Users/melihkarakose/Desktop/EC 581/btc_hourly_data_2017_2025.csv'
 output_csv_file = '/Users/melihkarakose/Desktop/EC 581/btc_hourly_data_filtered_from_existing.csv'
 columns_to_keep = ['timestamp', 'close', 'volume']
 

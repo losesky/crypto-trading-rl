@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RL Trading Episode Visualizer</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
         h1, h2 { text-align: center; color: #333; }
@@ -106,6 +107,11 @@
             rewardChartContainer.innerHTML = `<canvas id="${rewardCanvasId}"></canvas>`;
             episodeContainer.appendChild(rewardChartContainer);
             
+            // Steps Table
+            const tableContainer = document.createElement('div');
+            tableContainer.innerHTML = createStepsTable(data.steps_data);
+            episodeContainer.appendChild(tableContainer);
+
             visualizationArea.appendChild(episodeContainer);
 
 
@@ -184,6 +190,26 @@
                             },
                             legend: {
                                 display: true
+                            },
+                            zoom: {
+                                pan: {
+                                    enabled: true,
+                                    mode: 'x',
+                                    threshold: 5, // Minimum pan distance in pixels
+                                },
+                                zoom: {
+                                    wheel: {
+                                        enabled: true,
+                                    },
+                                    drag: {
+                                        enabled: true, // Enable drag-to-zoom
+                                        backgroundColor: 'rgba(0,123,255,0.2)', // Optional: color of the drag selection box
+                                    },
+                                    pinch: {
+                                        enabled: true // Enable pinch zoom for touch devices
+                                    },
+                                    mode: 'x', // Zoom only along the x-axis
+                                }
                             }
                         }
                     }
@@ -299,6 +325,47 @@
             episodeContainer.appendChild(tradesTableContainer);
         }
         
+        function createStepsTable(steps) {
+            if (!steps || steps.length === 0) return '<p>No step data available.</p>';
+
+            let tableHtml = '<h3>Steps Details</h3><table><thead><tr>' +
+                '<th>Step</th>' +
+                '<th>Timestamp</th>' +
+                '<th>Price (Decision)</th>' +
+                '<th>Action</th>' +
+                '<th>Reward</th>' +
+                '<th>Capital</th>' +
+                '<th>Position Before</th>' +
+                '<th>Position After</th>' +
+                '<th>Holding Period</th>' +
+                '<th>Realized PnL</th>' +
+                '<th>Unrealized PnL</th>' +
+                '<th>Entry Price</th>' +
+                '<th>Trade Units</th>' +
+                '</tr></thead><tbody>';
+
+            steps.forEach(step => {
+                tableHtml += '<tr>' +
+                    `<td>${step.step_in_episode}</td>` +
+                    `<td>${step.data_timestamp ? new Date(step.data_timestamp).toLocaleString() : 'N/A'}</td>` +
+                    `<td>${step.current_price_for_decision !== undefined ? step.current_price_for_decision.toFixed(2) : 'N/A'}</td>` +
+                    `<td class="action-${step.action_str ? step.action_str.toLowerCase() : 'unknown'}">${step.action_str || 'N/A'} (${step.action_int})</td>` +
+                    `<td>${step.reward !== undefined ? step.reward.toFixed(4) : 'N/A'}</td>` +
+                    `<td>${step.capital_after_step !== undefined ? step.capital_after_step.toFixed(2) : 'N/A'}</td>` +
+                    `<td>${step.position_before_action || 'N/A'}</td>` +
+                    `<td>${step.position_after_step || 'N/A'}</td>` +
+                    `<td>${step.holding_period_after_step !== undefined ? step.holding_period_after_step : 'N/A'}</td>` +
+                    `<td>${step.realized_pnl_this_step !== undefined ? step.realized_pnl_this_step.toFixed(2) : 'N/A'}</td>` +
+                    `<td>${step.unrealized_pnl_at_step_end !== undefined ? step.unrealized_pnl_at_step_end.toFixed(2) : 'N/A'}</td>` +
+                    `<td>${step.entry_price_if_in_position !== undefined ? step.entry_price_if_in_position.toFixed(2) : 'N/A'}</td>` +
+                    `<td>${step.trade_units !== undefined ? step.trade_units.toFixed(4) : 'N/A'}</td>` +
+                    '</tr>';
+            });
+
+            tableHtml += '</tbody></table>';
+            return tableHtml;
+        }
+
         function formatKey(key) {
             return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }

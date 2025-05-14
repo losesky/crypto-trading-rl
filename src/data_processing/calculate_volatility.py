@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 # Define the input and output file paths
-input_csv_path = '/Users/melihkarakose/Desktop/EC 581/btc_hourly_data_filtered_from_existing.csv'
+input_csv_path = '/Users/melihkarakose/Desktop/EC 581/data/btc_hourly_data_filtered_from_existing.csv'
 output_csv_path = '/Users/melihkarakose/Desktop/EC 581/btc_hourly_data_with_volatility.csv'
 
 # Read the CSV file
