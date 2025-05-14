@@ -1,0 +1,12 @@
+# macOS system files
+.DS_Store
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# VSCode settings (optional, uncomment if you want to ignore workspace settings)
+#.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
