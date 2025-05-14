@@ -105,7 +105,8 @@ class Agent:
         
         self.t_step = 0
         self.steps_done = 0
-        
+        self.evaluation_mode = False # Added for evaluation mode
+
         # Initialize trade-specific state
         self.trade_units = 0
 
@@ -119,7 +120,7 @@ class Agent:
 
     def reset(self):
         self.capital = self.initial_capital
-        self.current_position = "none"
+        self.current_position = "none" # Explicitly "none", "long", or "short"
         self.entry_price = 0
         self.holding_period = 0
         self.total_reward = 0
@@ -171,20 +172,27 @@ class Agent:
         
         return processed_state.astype(np.float32)
 
-    def select_action(self, state_np, add_noise=True):
+    def select_action(self, state_np, add_noise=True): # add_noise is effectively deprecated by evaluation_mode
         # state_np is expected to be (NUM_FEATURES, sequence_length)
-        epsilon = EPS_END + (EPS_START - EPS_END) * np.exp(-1. * self.steps_done / EPS_DECAY)
         
-        if add_noise:
-            self.steps_done += 1
-
-        if random.random() > epsilon or not add_noise:
-            # Add batch dimension: (1, NUM_FEATURES, sequence_length)
+        if self.evaluation_mode: # If in evaluation mode, no exploration
             state = torch.from_numpy(state_np).float().unsqueeze(0).to(device)
-            self.qnetwork_local.eval()
+            self.qnetwork_local.eval() # Ensure model is in eval mode
             with torch.no_grad():
                 action_values = self.qnetwork_local(state)
-            self.qnetwork_local.train()
+            # self.qnetwork_local.train() # No need to switch back to train here, managed by set_evaluation_mode
+            return np.argmax(action_values.cpu().data.numpy())
+
+        # Training mode: proceed with epsilon-greedy
+        epsilon = EPS_END + (EPS_START - EPS_END) * np.exp(-1. * self.steps_done / EPS_DECAY)
+        self.steps_done += 1
+        
+        if random.random() > epsilon:
+            state = torch.from_numpy(state_np).float().unsqueeze(0).to(device)
+            self.qnetwork_local.eval() # Temporarily set to eval for inference
+            with torch.no_grad():
+                action_values = self.qnetwork_local(state)
+            self.qnetwork_local.train() # Set back to train mode
             return np.argmax(action_values.cpu().data.numpy())
         else:
             return random.choice(np.arange(self.action_size))
@@ -215,8 +223,19 @@ class Agent:
     def store_experience(self, state, action, reward, next_state, done):
         self.memory.add(state, action, reward, next_state, done)
 
+    def set_evaluation_mode(self, is_eval_mode: bool):
+        """Sets the agent to evaluation or training mode."""
+        self.evaluation_mode = is_eval_mode
+        if self.evaluation_mode:
+            self.qnetwork_local.eval()
+            self.qnetwork_target.eval() # Also set target network to eval mode
+        else:
+            self.qnetwork_local.train()
+            self.qnetwork_target.train() # Also set target network to train mode
+
     def step(self, action_idx, current_price_for_decision, next_price_for_evaluation, current_timestamp):
         action_str = [k for k, v in self.actions.items() if v == action_idx][0]
+        position_before_action = self.current_position # Store position before action
 
         realized_pnl_this_step = 0
         # Note: unrealized_pnl variable here is for info dict, distinct from uPnL_after_action used in reward
@@ -275,12 +294,17 @@ class Agent:
         self.total_reward += current_step_reward
 
         info = {
-            "realized_pnl": realized_pnl_this_step, 
-            "unrealized_pnl": unrealized_pnl_info, 
-            "holding_period": self.holding_period, 
-            "position": self.current_position, 
-            "entry_price": self.entry_price,
-            "trade_units": self.trade_units
+            "action_taken": action_str,
+            "position_before_action": position_before_action,
+            "position_after_action": self.current_position, # current_position is updated by open/close
+            "realized_pnl_this_step": realized_pnl_this_step, 
+            "unrealized_pnl_at_step_end": unrealized_pnl_info, 
+            "holding_period_after_step": self.holding_period, 
+            "entry_price_if_in_position": self.entry_price,
+            "trade_units": self.trade_units,
+            "capital_after_step": self.capital, # Add capital to info
+            "current_price_for_decision": current_price_for_decision, # Add price to info
+            "data_timestamp": current_timestamp # Add timestamp to info
         }
         return current_step_reward, self.capital, info
 
@@ -320,4 +344,4 @@ if __name__ == '__main__':
     reward, capital, info = agent.step(action, price_for_decision, price_for_evaluation, current_timestamp=None)
     
     print(f"After step -> Reward: {reward:.2f}, Capital: {capital:.2f}")
-    print(f"Agent position: {info['position']}, Entry: {info['entry_price']:.2f}, Holding time: {info['holding_period']}")
+    print(f"Agent position: {info['position_after_action']}, Entry: {info['entry_price_if_in_position']:.2f}, Holding time: {info['holding_period_after_step']}")

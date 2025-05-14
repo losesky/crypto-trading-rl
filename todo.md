@@ -1,4 +1,10 @@
-# Reinforcement Learning in Trading Todo List
+# Reinforcement Learning in T- [x] Develop a more sophisticated evaluation and backtesting framework.
+  - [x] Implemented Sharpe Ratio, Max Drawdown, Win/Loss Ratio.
+  - [x] Implemented Buy and Hold baseline.
+  - [x] Implement `set_evaluation_mode` in Agent and ensure consistent `step_info` from `agent.step()`.
+  - [x] `train_agent.py` now correctly calls `agent.set_evaluation_mode()` and uses updated `step_info`.
+  - [ ] Implement Random Agent baseline.
+  - [ ] Use validation set for hyperparameter tuning.ading Todo List
 
 - [x] Download BTC hourly data from Binance (2022-01-01 to 2025-01-01) using ccxt
 - [x] Create a Python script (`src/download_data.py`) to fetch and save the data as CSV
@@ -26,8 +32,8 @@
 - [x] Enhance state representation (e.g., include volume, technical indicators beyond price changes).
   - [x] Agent now uses a window of log returns, 30-period volatility, window-normalized close prices, and window-normalized volumes as state.
   - [ ] Consider adding other indicators like RSI, MACD, Bollinger Bands.
-- [ ] Implement proper data splitting (train, validation, test sets).
-- [ ] Develop a more sophisticated evaluation and backtesting framework.
+- [x] Implement proper data splitting (train, validation, test sets).
+- [x] Develop a more sophisticated evaluation and backtesting framework.
 - [ ] Hyperparameter tuning for the RL agent and trading strategy.
 - [x] Add episode logging to `src/train_rl_agent.py` (JSON format).
 - [x] Create `visualization/episode_visualizer.html` for trade visualization (Capital, Rewards, Price, Trade Log).
