@@ -1,27 +1,27 @@
 # Reinforcement Learning in Trading Todo List
 
 - [x] Download BTC hourly data from Binance (2022-01-01 to 2025-01-01) using ccxt
-- [x] Create a Python script (`download_data.py`) to fetch and save the data as CSV
-- [x] Create a Python script (`filter_existing_csv.py`) to filter an existing CSV file to include only timestamp, close, and volume columns.
-- [x] Create a base Python script (`rl_agent.py`) for the Reinforcement Learning trading agent.
+- [x] Create a Python script (`src/download_data.py`) to fetch and save the data as CSV
+- [x] Create a Python script (`src/filter_existing_csv.py`) to filter an existing CSV file to include only timestamp, close, and volume columns.
+- [x] Create a base Python script (`src/rl_agent.py`) for the Reinforcement Learning trading agent.
   - [x] Initialize agent with capital, window size, and lambda.
   - [x] Define action space (short, long, hold).
   - [x] Implement placeholder for state representation (100-hour window).
   - [x] Implement placeholder for action selection (currently random).
   - [x] Implement reward function: (uPnL) * (lambda)^t + PnL.
   - [x] Implement basic step function logic for PnL and capital updates.
-- [x] Create a training environment script (`train_rl_agent.py`)
+- [x] Create a training environment script (`src/train_rl_agent.py`)
   - [x] Load filtered data (e.g., `btc_hourly_data_filtered_from_existing.csv`).
   - [x] Implement episode loop.
   - [x] Feed data windows to the agent, ensuring no future data leakage.
   - [x] Call agent's `step` method and track rewards/capital.
   - [x] Reset agent for new episodes.
 - [x] Implement a specific Reinforcement Learning algorithm (e.g., Q-learning, DQN, PPO) for `select_action` and agent learning.
-  - [x] Implemented Deep Q-Network (DQN) with MLP architecture using PyTorch in `rl_agent.py`.
+  - [x] Implemented Deep Q-Network (DQN) with MLP architecture using PyTorch in `src/rl_agent.py`.
   - [x] Added Replay Buffer and Epsilon-Greedy strategy.
-  - [x] Refine training loop in `train_rl_agent.py` to utilize DQN (experience storing, learning steps).
+  - [x] Refine training loop in `src/train_rl_agent.py` to utilize DQN (experience storing, learning steps).
 - [x] Transition DQN model from MLP to 1D CNN for state representation.
-- [x] Add calculation of log returns and 30-period volatility to the data pipeline (`calculate_volatility.py`).
+- [x] Add calculation of log returns and 30-period volatility to the data pipeline (`src/calculate_volatility.py`).
 - [ ] Add transaction costs and slippage to the simulation for realism.
 - [x] Enhance state representation (e.g., include volume, technical indicators beyond price changes).
   - [x] Agent now uses a window of log returns, 30-period volatility, window-normalized close prices, and window-normalized volumes as state.
@@ -29,5 +29,5 @@
 - [ ] Implement proper data splitting (train, validation, test sets).
 - [ ] Develop a more sophisticated evaluation and backtesting framework.
 - [ ] Hyperparameter tuning for the RL agent and trading strategy.
-- [x] Add episode logging to `train_rl_agent.py` (JSON format).
-- [x] Create `episode_visualizer.html` for trade visualization (Capital, Rewards, Price, Trade Log).
+- [x] Add episode logging to `src/train_rl_agent.py` (JSON format).
+- [x] Create `visualization/episode_visualizer.html` for trade visualization (Capital, Rewards, Price, Trade Log).
