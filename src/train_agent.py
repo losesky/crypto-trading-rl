@@ -144,8 +144,8 @@ def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation
             log_filename_suffix = f"_ep{episode_num + 1}"
             if evaluation_mode:
                 log_filename_suffix += f"_{dataset_name}_eval_nodata"
-            else:
-                log_filename_suffix += f"_nodata"
+            else: # Training mode
+                log_filename_suffix += f"_{dataset_name}_train_nodata" # Added _train and dataset_name
             log_filename = datetime.now().strftime("%d%m%Y-%H%M%S") + log_filename_suffix + ".json"
             if not os.path.exists(EPISODES_LOG_DIR):
                 os.makedirs(EPISODES_LOG_DIR)
@@ -287,6 +287,8 @@ def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation
         log_filename_suffix = f"_ep{episode_num + 1}"
         if evaluation_mode:
             log_filename_suffix += f"_{dataset_name}_eval"
+        else: # Training mode
+            log_filename_suffix += f"_{dataset_name}_train"
         log_filename = datetime.now().strftime("%d%m%Y-%H%M%S") + log_filename_suffix + ".json"
         if not os.path.exists(EPISODES_LOG_DIR):
             os.makedirs(EPISODES_LOG_DIR)
