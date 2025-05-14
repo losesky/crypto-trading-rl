@@ -286,10 +286,30 @@ class Agent:
             uPnL_for_reward = (self.entry_price - next_price_for_evaluation) * self.trade_units
             unrealized_pnl_info = uPnL_for_reward # For info dict
         
-        # Reward function: PnL (realized) + (uPnL_after_action * (lambda)^t)
-        current_step_reward = realized_pnl_this_step
-        if self.current_position != "none": # Only add uPnL component if a position is active
+        # --- MODIFIED REWARD CALCULATION START ---
+        # Define reward modification parameters (these can be tuned or made configurable)
+        LOSS_AVERSION_MULTIPLIER = 1.5  # Penalize losses more
+        CAPITAL_PRESERVATION_PENALTY_AMOUNT = 25 # Fixed penalty amount if capital is below initial
+
+        current_step_reward = 0
+
+        # 1. Apply realized PnL, with extra penalty for losses
+        if realized_pnl_this_step < 0:
+            current_step_reward += realized_pnl_this_step * LOSS_AVERSION_MULTIPLIER
+        else:
+            current_step_reward += realized_pnl_this_step
+
+        # 2. Add discounted unrealized PnL if a position is active (as before)
+        if self.current_position != "none":
             current_step_reward += uPnL_for_reward * (self.lambda_reward ** self.holding_period)
+
+        # 3. Apply penalty if capital is below initial capital
+        if self.capital < self.initial_capital:
+            current_step_reward -= CAPITAL_PRESERVATION_PENALTY_AMOUNT
+            # Optional: Could make this penalty proportional to the deficit, e.g.:
+            # deficit = self.initial_capital - self.capital
+            # current_step_reward -= (deficit / self.initial_capital) * SOME_SCALING_FACTOR 
+        # --- MODIFIED REWARD CALCULATION END ---
         
         self.total_reward += current_step_reward
 

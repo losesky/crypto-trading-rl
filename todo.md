@@ -36,4 +36,5 @@
 - [x] Develop a more sophisticated evaluation and backtesting framework.
 - [ ] Hyperparameter tuning for the RL agent and trading strategy.
 - [x] Add episode logging to `src/train_rl_agent.py` (JSON format).
+- [x] Update episode log filenames to include _train or _eval tags and dataset name for clarity (May 14, 2025)
 - [x] Create `visualization/episode_visualizer.html` for trade visualization (Capital, Rewards, Price, Trade Log).
