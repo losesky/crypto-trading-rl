@@ -34,6 +34,7 @@
   - [ ] Consider adding other indicators like RSI, MACD, Bollinger Bands.
 - [x] Implement proper data splitting (train, validation, test sets).
 - [x] Develop a more sophisticated evaluation and backtesting framework.
+- [x] Enhance reward function to penalize losses and capital drawdown for capital preservation (May 14, 2025)
 - [ ] Hyperparameter tuning for the RL agent and trading strategy.
 - [x] Add episode logging to `src/train_rl_agent.py` (JSON format).
 - [x] Update episode log filenames to include _train or _eval tags and dataset name for clarity (May 14, 2025)
