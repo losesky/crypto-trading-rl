@@ -15,6 +15,9 @@ NUM_EPISODES = 10 # Number of times to run through the data (or part of it)
 LOG_EPISODES = True
 EPISODES_LOG_DIR = "episodes"
 
+# Global variable to hold the current run's log directory
+CURRENT_RUN_LOG_DIR = None
+
 def calculate_sharpe_ratio(capital_over_time, risk_free_rate=0.0):
     """Calculates the Sharpe ratio for a series of capital values."""
     if len(capital_over_time) < 2:
@@ -55,7 +58,7 @@ def run_buy_and_hold_strategy(data_df, initial_capital):
     final_capital_bh = capital_over_time_bh[-1]
     return final_capital_bh, max_drawdown_bh, capital_over_time_bh
 
-def load_data(file_path, test_size=0.15, validation_size=0.15):
+def load_data(file_path, test_size=0.3, validation_size=0.0): # Updated default test_size to 0.3
     """Loads and preprocesses the financial data, then splits it."""
     try:
         df = pd.read_csv(file_path)
@@ -68,28 +71,24 @@ def load_data(file_path, test_size=0.15, validation_size=0.15):
         print(f"Error: CSV file must contain {required_cols} columns. Found: {df.columns}")
         return None, None, None
         
-    if len(df) < WINDOW_SIZE + 1:
+    if len(df) < WINDOW_SIZE + 1: # Keep this check
         print(f"Error: Data has {len(df)} rows, not enough for window size {WINDOW_SIZE} + 1 next step.")
-        return None, None, None
+        return None, None, None # Return three values as expected by caller
         
-    remaining_size = test_size + validation_size
-    if remaining_size >= 1.0:
-        print("Error: test_size + validation_size must be less than 1.0")
-        return None, None, None
+    # Simplified split: train and test only
+    if test_size >= 1.0 or test_size < 0:
+        print("Error: test_size must be between 0.0 and 1.0")
+        return None, None, None # Return three values
 
-    train_df, remaining_df = train_test_split(df, test_size=remaining_size, shuffle=False)
+    train_df, test_df = train_test_split(df, test_size=test_size, shuffle=False)
+    
+    # Validation dataframe is now empty
+    val_df = pd.DataFrame()
 
-    if remaining_size == 0:
-        val_df = pd.DataFrame()
-        test_df = pd.DataFrame()
-    else:
-        test_proportion_in_remaining = test_size / remaining_size
-        val_df, test_df = train_test_split(remaining_df, test_size=test_proportion_in_remaining, shuffle=False)
+    print(f"Data loaded. Train size: {len(train_df)}, Test size: {len(test_df)}")
+    return train_df, val_df, test_df # val_df is now empty
 
-    print(f"Data loaded. Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
-    return train_df, val_df, test_df
-
-def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation_mode=False):
+def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation_mode=False, log_dir=None):
     """Runs a single episode of training/simulation."""
     print(f"--- Starting Episode {episode_num + 1} on {dataset_name} Data {'(Evaluation)' if evaluation_mode else ''} ---")
     agent.reset()
@@ -147,9 +146,10 @@ def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation
             else: # Training mode
                 log_filename_suffix += f"_{dataset_name}_train_nodata" # Added _train and dataset_name
             log_filename = datetime.now().strftime("%d%m%Y-%H%M%S") + log_filename_suffix + ".json"
-            if not os.path.exists(EPISODES_LOG_DIR):
-                os.makedirs(EPISODES_LOG_DIR)
-            log_filepath = os.path.join(EPISODES_LOG_DIR, log_filename)
+            log_dir_to_use = log_dir if log_dir is not None else EPISODES_LOG_DIR
+            if not os.path.exists(log_dir_to_use):
+                os.makedirs(log_dir_to_use)
+            log_filepath = os.path.join(log_dir_to_use, log_filename)
             try:
                 with open(log_filepath, 'w') as f:
                     json.dump(episode_log_data, f, indent=4)
@@ -199,7 +199,7 @@ def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation
             elif realized_pnl_this_step < 0:
                 losing_trades += 1
         
-        if LOG_EPISODES and not evaluation_mode:
+        if LOG_EPISODES: # Changed: Log steps for both training and evaluation
             log_step_data = {
                 "step_in_episode": i - start_index + 1,
                 "data_timestamp": str(current_timestamp),
@@ -290,9 +290,10 @@ def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation
         else: # Training mode
             log_filename_suffix += f"_{dataset_name}_train"
         log_filename = datetime.now().strftime("%d%m%Y-%H%M%S") + log_filename_suffix + ".json"
-        if not os.path.exists(EPISODES_LOG_DIR):
-            os.makedirs(EPISODES_LOG_DIR)
-        log_filepath = os.path.join(EPISODES_LOG_DIR, log_filename)
+        log_dir_to_use = log_dir if log_dir is not None else EPISODES_LOG_DIR
+        if not os.path.exists(log_dir_to_use):
+            os.makedirs(log_dir_to_use)
+        log_filepath = os.path.join(log_dir_to_use, log_filename)
         try:
             with open(log_filepath, 'w') as f:
                 json.dump(episode_log_data, f, indent=4)
@@ -305,6 +306,13 @@ def run_episode(agent, data_df, episode_num, dataset_name="Training", evaluation
            winning_trades, losing_trades, capital_over_time
 
 def main():
+    global CURRENT_RUN_LOG_DIR
+    # Create a unique subfolder for this run
+    run_timestamp = datetime.now().strftime("%d%m%Y-%H%M%S")
+    CURRENT_RUN_LOG_DIR = os.path.join(EPISODES_LOG_DIR, run_timestamp)
+    if not os.path.exists(CURRENT_RUN_LOG_DIR):
+        os.makedirs(CURRENT_RUN_LOG_DIR)
+
     train_data, val_data, test_data = load_data(DATA_FILE_PATH)
 
     if train_data is not None and not train_data.empty:
@@ -318,14 +326,9 @@ def main():
             if len(train_data) < WINDOW_SIZE + 2: # Ensure enough data for at least one step
                 print(f"Not enough training data for episode {episode + 1}. Skipping.")
                 continue
-            # Training episodes are run with evaluation_mode=False by default in run_episode
-            run_episode(trading_agent, train_data, episode, dataset_name="Training", evaluation_mode=False)
+            run_episode(trading_agent, train_data, episode, dataset_name="Training", evaluation_mode=False, log_dir=CURRENT_RUN_LOG_DIR)
         
         print("\n=== Evaluation Phase ===")
-        # The call to set_evaluation_mode(True) is now handled within run_episode for evaluation runs.
-        # We can remove the explicit call here if run_episode handles it, or keep for clarity.
-        # For now, let's rely on run_episode to set it based on its evaluation_mode parameter.
-
         if test_data is not None and not test_data.empty:
             if len(test_data) < WINDOW_SIZE + 2: # Ensure enough data for at least one step
                 print("Not enough test data for evaluation. Skipping.")
@@ -333,7 +336,7 @@ def main():
                 print("\n--- Evaluating Agent on Test Data ---")
                 agent_final_capital, agent_total_reward, agent_max_dd, \
                 agent_wins, agent_losses, agent_capital_over_time = run_episode(
-                    trading_agent, test_data, 0, dataset_name="Test", evaluation_mode=True
+                    trading_agent, test_data, 0, dataset_name="Test", evaluation_mode=True, log_dir=CURRENT_RUN_LOG_DIR
                 )
                 agent_sharpe = calculate_sharpe_ratio(agent_capital_over_time)
                 agent_wl_ratio = agent_wins / agent_losses if agent_losses > 0 else float('inf') if agent_wins > 0 else 0
