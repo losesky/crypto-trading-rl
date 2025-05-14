@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-from rl_agent import Agent # Assuming rl_agent.py is in the same directory
+from rl.agent import Agent # Assuming rl_agent.py is in the same directory
 import os
 import json
 from datetime import datetime
 
 # Configuration
-DATA_FILE_PATH = "btc_hourly_data_with_volatility.csv" # <--- CHANGED TO USE THE FILE WITH VOLATILITY
+DATA_FILE_PATH = "/Users/melihkarakose/Desktop/EC 581/data/btc_hourly_data_with_volatility.csv" # <--- CHANGED TO USE THE FILE WITH VOLATILITY
 INITIAL_CAPITAL = 10000.0
 WINDOW_SIZE = 100
 LAMBDA_VAL = 0.75
