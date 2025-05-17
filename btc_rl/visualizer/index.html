@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTC Trading Agent · Live Visualisation</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js & annotation plug-in -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.js"></script>
+
+  <style>
+    :root{
+      --clr-bg-1:#0f172a;--clr-bg-2:#1e293b;
+      --clr-card:rgba(255,255,255,.08);--clr-card-border:rgba(255,255,255,.16);
+      --clr-text:#f1f5f9;--clr-accent:#38bdf8;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:"Inter",system-ui,sans-serif;
+      background:linear-gradient(160deg,var(--clr-bg-1),var(--clr-bg-2));
+      color:var(--clr-text);min-height:100vh;
+      display:flex;flex-direction:column;align-items:center;
+      padding:2rem 1rem 4rem;
+    }
+    h1{font-weight:700;font-size:clamp(1.8rem,2vw+1rem,2.4rem);
+       letter-spacing:-.03em;margin-bottom:1.5rem;text-align:center}
+    .card{
+      background:var(--clr-card);border:1px solid var(--clr-card-border);
+      border-radius:1rem;backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);box-shadow:0 4px 12px rgba(0,0,0,.25)
+    }
+    .stats-wrapper{width:100%;max-width:1000px;margin-bottom:2rem}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem}
+    .stat-card{padding:1rem 1.2rem;text-align:center}
+    .stat-card h3{font-size:.75rem;font-weight:600;opacity:.8;margin-bottom:.25rem}
+    .stat-card p{font-size:1.05rem;font-weight:500;word-break:break-word}
+    .chart-card{width:100%;max-width:1000px;margin-bottom:2rem;padding:1rem}
+    canvas{display:block;width:100%!important;height:320px!important}
+    @media(max-width:640px){canvas{height:260px!important}}
+
+    /* trades table */
+    .trades-card{width:100%;max-width:1000px;padding:1rem}
+    table{width:100%;border-collapse:collapse;font-size:.8rem}
+    thead{background:rgba(255,255,255,.05)}
+    th,td{padding:.45rem .6rem;text-align:right}
+    th{text-align:center;font-weight:600}
+    tbody tr:nth-child(odd){background:rgba(255,255,255,.03)}
+    .trade-buy{color:#22c55e}
+    .trade-sell{color:#ef4444}
+    .trade-liquid{color:#000;background:#facc15;font-weight:700}
+  </style>
+</head>
+<body>
+  <h1>BTC Trading Agent · <span style="color:var(--clr-accent);">Live</span> Visualisation</h1>
+
+  <!-- ========== STATS ========== -->
+  <section class="stats-wrapper card">
+    <div class="stats-grid">
+      <div class="stat-card"><h3>Step</h3><p id="stat-step">-</p></div>
+      <div class="stat-card"><h3>Action</h3><p id="stat-action">-</p></div>
+      <div class="stat-card"><h3>Cash</h3><p id="stat-cash">-</p></div>
+      <div class="stat-card"><h3>uPnL</h3><p id="stat-upnl">-</p></div>
+      <div class="stat-card"><h3>Margin Equity</h3><p id="stat-meq">-</p></div>
+      <div class="stat-card"><h3>B&amp;H Equity</h3><p id="stat-bh_eq">-</p></div>
+      <div class="stat-card"><h3>Reward</h3><p id="stat-reward">-</p></div>
+      <div class="stat-card"><h3>Total Fees</h3><p id="stat-fee">-</p></div>
+      <div class="stat-card"><h3>Liquidated</h3><p id="stat-liq">-</p></div>
+      <div class="stat-card"><h3>Term Reason</h3><p id="stat-term">-</p></div>
+      <div class="stat-card"><h3>BTC Price</h3><p id="stat-price">-</p></div>
+      <div class="stat-card"><h3>Position BTC</h3><p id="stat-pos_btc">-</p></div>
+    </div>
+  </section>
+
+  <!-- ========== CHARTS ========== -->
+  <section class="chart-card card"><canvas id="btcChart"></canvas></section>
+  <section class="chart-card card"><canvas id="marginEquityChart"></canvas></section>
+
+  <!-- ========== TRADES ========== -->
+  <section class="trades-card card">
+    <h2 style="margin-bottom:.75rem;text-align:center;font-weight:600;">Recent Trades</h2>
+    <table id="tradesTable">
+      <thead>
+        <tr>
+          <th>Step</th><th>Side</th><th>Action Val</th>
+          <th>Price</th><th>Pos BTC</th><th>Cash</th>
+          <th>Margin Eq</th><th>Reward</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      /*  ==== DOM SHORTCUTS ==== */
+      const $ = id => document.getElementById(id);
+      const statStep = $('stat-step'), statAction = $('stat-action'),
+            statCash = $('stat-cash'), statUpnl = $('stat-upnl'),
+            statMeq = $('stat-meq'), statBhEq = $('stat-bh_eq'),
+            statReward = $('stat-reward'), statFee = $('stat-fee'), statLiq = $('stat-liq'),
+            statTerm = $('stat-term'), statPrice = $('stat-price'),
+            statPosBtc = $('stat-pos_btc');
+      const tradesTbody = document.querySelector('#tradesTable tbody');
+
+      /*  ==== CHARTS ==== */
+      const priceCtx = document.getElementById('btcChart').getContext('2d');
+      const meCtx    = document.getElementById('marginEquityChart').getContext('2d');
+      let btcChart, meChart;
+      let chartUpdateCounter = 0;
+      const CHART_UPDATE_SKIP = 1;  // render every data point for smoothness
+
+      function newLineChart(ctx, label, color){
+        return new Chart(ctx,{
+          type:'line',
+          data:{labels:[],datasets:[{label,color:borderColor=color,borderWidth:2,tension:0.4,pointRadius:1,data:[]}]},
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            scales:{
+              x:{title:{display:true,text:'Step'},ticks:{autoSkip:true,maxTicksLimit:15,color:'#cbd5e1'},grid:{color:'rgba(255,255,255,.05)'}},
+              y:{title:{display:true,text:label},ticks:{color:'#cbd5e1'},grid:{color:'rgba(255,255,255,.05)'}}
+            },
+            plugins:{
+              legend:{labels:{color:'#f1f5f9'}},
+              tooltip:{mode:'index',intersect:false},
+              annotation:{annotations:{}}
+            },
+            animation:{duration:50}
+          }
+        });
+      }
+      btcChart = newLineChart(priceCtx,'BTC Price (USD)','#38bdf8');
+      meChart  = newLineChart(meCtx,'Margin Equity (USD)','#4ade80');
+
+      // add buy-and-hold equity line to same chart
+      meChart.data.datasets.push({
+        label: 'B&H Equity (USD)',
+        borderColor: '#facc15',
+        borderWidth: 2,
+        tension: 0.4,
+        pointRadius: 1,
+        data: []
+      });
+
+      /*  ==== HELPERS ==== */
+      function num(v,dec=2){return v?.toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec})??'-';}
+      function cls(side){return side==='BUY'?'trade-buy':side==='SELL'?'trade-sell':'trade-liquid';}
+
+      function addTradeRow(d){
+        const side = d.was_liquidated_this_step ? 'LIQ' : (d.action>0?'BUY':d.action<0?'SELL':'FLAT');
+        const tr = document.createElement('tr');
+        tr.className = cls(side);
+        tr.innerHTML = `
+          <td>${d.step}</td>
+          <td>${side}</td>
+          <td>${d.action?.toFixed(2)}</td>
+          <td>${num(d.price,2)}</td>
+          <td>${d.position_btc?.toFixed(6)}</td>
+          <td>${num(d.cash_balance,1)}</td>
+          <td>${num(d.margin_equity,1)}</td>
+          <td>${d.reward?.toFixed(4)}</td>`;
+        tradesTbody.prepend(tr);
+        if(tradesTbody.rows.length>100){tradesTbody.deleteRow(-1);}
+      }
+
+      function updateStats(d){
+        statStep.textContent   = d.step;
+        statAction.textContent = d.action?.toFixed(2)??'-';
+        statCash.textContent   = num(d.cash_balance,1);
+        statUpnl.textContent   = num(d.upnl,1);
+        statMeq.textContent    = num(d.margin_equity,1);
+        statBhEq.textContent   = num(d.buy_and_hold_equity,1);
+        statReward.textContent = d.reward?.toFixed(4)??'-';
+        statFee.textContent    = num(d.total_fee,1);
+        statLiq.textContent    = d.was_liquidated_this_step?'Yes':'-';
+        statTerm.textContent   = d.termination_reason??'-';
+        statPrice.textContent  = num(d.price,2);
+        statPosBtc.textContent = d.position_btc?.toFixed(6)??'-';
+      }
+
+      function updateCharts(d){
+        const lbl = String(d.step);
+        chartUpdateCounter++;
+        const shouldRender = (chartUpdateCounter % CHART_UPDATE_SKIP === 0);
+        btcChart.data.labels.push(lbl);
+        meChart.data.labels.push(lbl);
+        btcChart.data.datasets[0].data.push(d.price);
+        meChart.data.datasets[0].data.push(d.margin_equity);
+        meChart.data.datasets[1].data.push(d.buy_and_hold_equity);
+
+        /* annotations for trades / liquidations */
+        if(d.was_liquidated_this_step || Math.abs(d.action)>0.01){
+          let color='grey',style='circle',rot=0,radius=6;
+          if(d.was_liquidated_this_step){color='black';style='rectRot';radius=12;}
+          else{
+            radius = 4+Math.abs(d.action)*10;
+            if(d.action>0){color='rgba(16,185,129,.9)';style='triangle';}
+            else          {color='rgba(239,68,68,.9)';style='triangle';rot=180;}
+          }
+          btcChart.options.plugins.annotation.annotations[`a${d.step}`]={
+            type:'point',xValue:lbl,yValue:d.price,backgroundColor:color,
+            borderColor:'#000',borderWidth:1,pointStyle:style,radius,rotation:rot
+          };
+        }
+
+        /* keep last 50 steps */
+        const MAX=50;
+        if(btcChart.data.labels.length>MAX){
+          btcChart.data.labels.shift();btcChart.data.datasets[0].data.shift();
+          meChart.data.labels.shift();meChart.data.datasets[0].data.shift();
+          meChart.data.datasets[1].data.shift();
+          /* prune annotations */
+          const visible=new Set(btcChart.data.labels);
+          Object.keys(btcChart.options.plugins.annotation.annotations).forEach(k=>{
+            if(!visible.has(btcChart.options.plugins.annotation.annotations[k].xValue)) delete btcChart.options.plugins.annotation.annotations[k];
+          });
+        }
+        if(shouldRender){
+          btcChart.update('none');
+          meChart.update('none');
+        }
+      }
+
+      /*  ==== WEBSOCKET ==== */
+      const ws = new WebSocket('ws://localhost:8765');
+      ws.addEventListener('open',()=>console.log('[WS] connected'));
+      ws.addEventListener('message',e=>{
+        try{
+          const d = JSON.parse(e.data);
+          updateStats(d); updateCharts(d); addTradeRow(d);
+        }catch(err){console.error(err);}
+      });
+      ws.addEventListener('close',()=>alert('WebSocket closed — server down?'));
+      ws.addEventListener('error',()=>alert('WebSocket error'));
+    });
+  </script>
+</body>
+</html>

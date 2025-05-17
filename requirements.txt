@@ -1,4 +1,7 @@
 pandas
 numpy
-torch
-ccxt
+gymnasium
+stable-baselines3[extra]
+torch  # GPU if available, CPU fallback
+matplotlib
+websockets
