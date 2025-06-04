@@ -24,7 +24,6 @@ logger = logging.getLogger("websocket_server")
 # WebSocket配置
 WS_HOST = "localhost"
 WS_PORT = 8765
-HTTP_PORT = 8766  # 为HTTP服务使用不同的端口
 WEBSOCKET_CLIENTS = set()
 MESSAGE_QUEUE = queue.Queue(maxsize=100)  # 线程安全队列
 
@@ -271,10 +270,10 @@ class MessageHandler(BaseHTTPRequestHandler):
 
 def run_http_server(host="localhost", port=None):
     """在单独的线程中运行HTTP服务器"""
-    global HTTP_PORT  # 在使用HTTP_PORT之前声明为全局变量
+    global WS_PORT  # 使用WebSocket的端口
     
     if port is None:
-        port = HTTP_PORT
+        port = WS_PORT
     
     # 尝试最多3次，如果指定端口被占用则尝试下一个端口
     for attempt in range(3):
@@ -283,10 +282,10 @@ def run_http_server(host="localhost", port=None):
             server = HTTPServer((host, current_port), MessageHandler)
             logger.info(f"HTTP消息接收器已启动 http://{host}:{current_port}/send_message")
             
-            # 如果使用了不同的端口，更新全局HTTP_PORT
-            if current_port != HTTP_PORT:
-                HTTP_PORT = current_port
-                logger.info(f"更新HTTP端口为: {HTTP_PORT}")
+            # 如果使用了不同的端口，更新全局WS_PORT（让WebSocket也使用同一端口）
+            if current_port != WS_PORT:
+                WS_PORT = current_port
+                logger.info(f"更新WebSocket端口为: {WS_PORT}")
                 
             # 启动服务器
             server.serve_forever()
@@ -302,15 +301,25 @@ def run_http_server(host="localhost", port=None):
     logger.error(f"无法启动HTTP服务器，所有尝试的端口都被占用")
     return None
 
-if __name__ == "__main__":
+def main():
+    """作为模块导入时的入口点"""
     try:
-        # # 启动HTTP服务器线程
+        # 先启动WebSocket服务器，这样HTTP服务器可以使用相同的端口
+        logger.info("正在启动WebSocket服务器和HTTP服务器...")
+        
+        # 启动HTTP服务器线程，它会使用WebSocket的端口
         # http_server_thread = threading.Thread(target=run_http_server, daemon=True)
         # http_server_thread.start()
+        # logger.info("HTTP服务线程已启动，使用WebSocket端口")
         
-        # 启动WebSocket服务器
+        # 启动WebSocket服务器（主线程）
         asyncio.run(start_server())
     except KeyboardInterrupt:
         logger.info("服务器被手动停止")
     except Exception as e:
         logger.error(f"服务器错误: {e}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    main()

@@ -21,7 +21,7 @@ fi
 # 激活虚拟环境
 source venv/bin/activate
 
-# 安装依赖
+# 安装其余依赖
 echo "安装依赖包..."
 pip install -r requirements.txt
 

@@ -5,7 +5,7 @@ for the BTC RL project.
 
 Usage
 -----
-python -m src.preprocessing --csv /btc_rl/data/BTC_hourly.csv
+python -m btc_rl.src.preprocessing --csv /btc_rl/data/BTC_hourly.csv
 """
 import argparse
 from pathlib import Path

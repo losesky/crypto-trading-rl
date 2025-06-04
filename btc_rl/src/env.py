@@ -36,15 +36,15 @@ class BtcTradingEnv(gym.Env):
         reward_weights: Tuple[float, float, float, float] = (
             1.0,   # α  (uPnL)
             1.0,   # β  (ΔMarginEquity)
-            5.0,   # γ  (drawdown)
+            10.0,  # γ  (drawdown) - 增加对回撤的惩罚
             0.5,   # δ  (holding)
         ),
         risk_capital_source: str = "initial_balance", # "initial_balance", "cash_balance", or "margin_equity"
-        risk_fraction_per_trade: float = 0.05, # e.g., 5% of risk capital per trade
-        max_leverage: float = 1.0, # Max leverage on margin_equity
+        risk_fraction_per_trade: float = 0.02, # 降低到2%的风险资本比例，减少每笔交易的风险
+        max_leverage: float = 3.0, # 设置为配置文件中的值(3.0)
         fee_rate: float = 0.0002,          # 2 bp per trade notional
         maintenance_margin_rate: float = 0.05, # 5% maintenance margin
-        liquidation_penalty_rate: float = 0.01, # 1% penalty on notional value if liquidated
+        liquidation_penalty_rate: float = 0.05, # 增加到5%，提高清算惩罚
         max_abs_position_btc_cap: float = 100.0, # Max absolute BTC position
         funding_rate_hourly: float = 0.0001 / 24, # Example: 0.01% daily / 24 hours
         flat_bonus: float = 0.02,          # reward for being flat & above EMA
@@ -134,6 +134,18 @@ class BtcTradingEnv(gym.Env):
 
     def step(self, action: np.ndarray):
         act = float(np.clip(action[0], -1.0, 1.0))
+        
+        # 检查索引是否在有效范围内
+        if self.idx >= len(self.prices):
+            # 已经达到数据末尾，返回模拟结束信号
+            return np.zeros_like(self.windows[0]), 0.0, True, False, {
+                "margin_equity": self.margin_equity,
+                "cash_balance": self.cash_balance,
+                "bankrupt": False,
+                "liquidated": False,
+                "end_of_data": True
+            }
+            
         price = float(self.prices[self.idx])
         step_fee_cost = 0.0  # fees incurred in this step
         self.was_liquidated_this_step = False
@@ -238,11 +250,31 @@ class BtcTradingEnv(gym.Env):
 
         total_costs_this_step = step_fee_cost
 
+        # 添加对接近破产状态的额外惩罚
+        bankruptcy_risk = 0.0
+        if self.margin_equity > 0:
+            # 当保证金权益低于初始资金的10%时，开始施加越来越强的惩罚
+            bankruptcy_threshold = self.initial_balance * 0.1
+            if self.margin_equity < bankruptcy_threshold:
+                bankruptcy_risk_factor = (bankruptcy_threshold - self.margin_equity) / bankruptcy_threshold
+                bankruptcy_risk = 15.0 * bankruptcy_risk_factor**2  # 指数惩罚
+                
+        # 添加对单次大亏损的惩罚
+        large_loss_penalty = 0.0
+        if Δ_margin_equity_numeric < 0:
+            # 计算亏损占账户总值的比例
+            loss_ratio = abs(Δ_margin_equity_numeric) / margin_equity_at_step_start if margin_equity_at_step_start > 1e-9 else 0.0
+            # 当单次亏损超过5%时开始惩罚，亏损越大惩罚越重
+            if loss_ratio > 0.05:
+                large_loss_penalty = 5.0 * (loss_ratio - 0.05)**2
+
         reward = (
             self.α * uPnL_norm
             + self.β * Δ_margin_equity_ratio
             - self.γ * drawdown**2
             - self.δ * hold_norm * κ
+            - bankruptcy_risk  # 添加破产风险惩罚
+            - large_loss_penalty  # 添加大亏损惩罚
             - (total_costs_this_step / margin_equity_at_step_start if abs(margin_equity_at_step_start) > 1e-9 else 0.0)
         )
 
@@ -309,8 +341,6 @@ class BtcTradingEnv(gym.Env):
                 fee_paid=self.total_fee_paid,
             )
         )
-
-        self.idx += 1
         
         info = {
             "margin_equity": self.margin_equity,
@@ -323,7 +353,11 @@ class BtcTradingEnv(gym.Env):
             self._dump_episode()
             return np.zeros_like(self.windows[0]), reward, True, False, info
         
-        return self.windows[self.idx], reward, False, False, info
+        # 增加索引前先保存当前窗口，以便在返回前确保索引在有效范围内
+        current_window = self.windows[self.idx]
+        self.idx += 1
+        
+        return current_window, reward, False, False, info
 
 
     def _calculate_trade_and_fee(self, act: float, price: float, current_margin_equity: float) -> Tuple[float, float]:
