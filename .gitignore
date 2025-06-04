@@ -34,7 +34,7 @@ btc_rl/logs/
 btc_rl/models/
 
 # Data files (you may want to include or exclude these)
-btc_rl/data/*.npz
+# btc_rl/data/*.npz
 
 # PyCharm
 .idea/
