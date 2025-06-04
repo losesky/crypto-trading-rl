@@ -27,8 +27,8 @@ ENV/
 .vscode/
 
 # TensorBoard logs (optional, depending on your needs)
-btc_rl/logs/tb/
-btc_rl/logs/episodes/
+btc_rl/logs/
+btc_rl/logs/
 
 # Models (optional, depending on your needs)
 btc_rl/models/
