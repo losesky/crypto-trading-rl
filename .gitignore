@@ -1,0 +1,44 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+*.log
+
+# Environments
+.env
+.venv
+
+# VSCode
+.vscode/
+
+# TensorBoard logs (optional, depending on your needs)
+btc_rl/logs/tb/
+btc_rl/logs/episodes/
+
+# Models (optional, depending on your needs)
+btc_rl/models/
+
+# Data files (you may want to include or exclude these)
+btc_rl/data/*.npz
+
+# PyCharm
+.idea/
+
+# OS specific
+.DS_Store
+Thumbs.db

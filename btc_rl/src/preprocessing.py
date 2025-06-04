@@ -5,7 +5,7 @@ for the BTC RL project.
 
 Usage
 -----
-python -m src.preprocessing --csv data/BTC_hourly.csv
+python -m src.preprocessing --csv /btc_rl/data/BTC_hourly.csv
 """
 import argparse
 from pathlib import Path
@@ -89,9 +89,9 @@ def main(csv_path: Path):
     p_train, p_test = exec_prices[:split_idx], exec_prices[split_idx:]
 
     # 8) save
-    Path("data").mkdir(exist_ok=True)
-    np.savez_compressed("data/train_data.npz", X=X_train, prices=p_train)
-    np.savez_compressed("data/test_data.npz", X=X_test, prices=p_test)
+    Path("btc_rl/data").mkdir(exist_ok=True)
+    np.savez_compressed("btc_rl/data/train_data.npz", X=X_train, prices=p_train)
+    np.savez_compressed("btc_rl/data/test_data.npz", X=X_test, prices=p_test)
 
     print(
         f"✅ Saved: train_data.npz ({X_train.shape[0]} samples, obs shape {X_train.shape[1:]}) • "

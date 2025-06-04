@@ -48,7 +48,7 @@ class BtcTradingEnv(gym.Env):
         max_abs_position_btc_cap: float = 100.0, # Max absolute BTC position
         funding_rate_hourly: float = 0.0001 / 24, # Example: 0.01% daily / 24 hours
         flat_bonus: float = 0.02,          # reward for being flat & above EMA
-        log_dir: str | Path = "logs/episodes",
+        log_dir: str | Path = "btc_rl/logs/episodes",
         websocket_queue: queue.Queue | None = None, # Added websocket_queue
     ):
         super().__init__()

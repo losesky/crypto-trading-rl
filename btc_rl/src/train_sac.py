@@ -16,8 +16,8 @@ from gymnasium.wrappers import TimeLimit
 from stable_baselines3 import SAC
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from src.env import BtcTradingEnv
-from src.policies import TimeSeriesCNN
+from btc_rl.src.env import BtcTradingEnv
+from btc_rl.src.policies import TimeSeriesCNN
 
 # --- WebSocket Server Setup ---
 WEBSOCKET_CLIENTS = set()
@@ -107,7 +107,7 @@ def start_websocket_server_thread():
 
 
 def make_env(split: str, msg_queue: queue.Queue):
-    data = np.load(f"data/{split}_data.npz")
+    data = np.load(f"btc_rl/data/{split}_data.npz")
     windows, prices = data["X"], data["prices"]
     print(f"{split} set windows.shape = {windows.shape}") 
     env = BtcTradingEnv(windows, 
@@ -143,16 +143,16 @@ def main(episodes: int = 10):
         policy_kwargs=policy_kwargs,
         buffer_size=100_000,
         verbose=1,
-        tensorboard_log="logs/tb/",
+        tensorboard_log="btc_rl/logs/tb/",
         device="auto",
     )
 
     # compute steps from file, not env wrapper magic
-    n_timesteps = np.load("data/train_data.npz")["X"].shape[0]
+    n_timesteps = np.load("btc_rl/data/train_data.npz")["X"].shape[0]
 
     for ep in range(episodes):
         model.learn(total_timesteps=n_timesteps, reset_num_timesteps=False, progress_bar=True)
-        model.save(f"models/sac_ep{ep+1}.zip")
+        model.save(f"btc_rl/models/sac_ep{ep+1}.zip")
 
 
 if __name__ == "__main__":

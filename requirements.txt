@@ -1,7 +1,11 @@
-pandas
-numpy
-gymnasium
-stable-baselines3[extra]
-torch  # GPU if available, CPU fallback
-matplotlib
-websockets
+torch>=1.9.0
+numpy>=1.21.0
+pandas>=1.3.0
+matplotlib>=3.4.0
+gymnasium>=0.28.0
+stable-baselines3[extra]>=2.0.0
+websockets>=10.0
+tensorboard>=2.7.0
+scikit-learn>=1.0.0
+tqdm>=4.62.0
+rich>=10.0.0
