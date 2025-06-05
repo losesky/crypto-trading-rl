@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket连接测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 20px;
+            background-color: #f6f8fa;
+        }
+        h1 {
+            color: #24292e;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        #output {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            border-radius: 5px;
+            height: 400px;
+            overflow: auto;
+            font-family: 'Courier New', Courier, monospace;
+            margin-top: 20px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+            white-space: pre-wrap;
+        }
+        .system {
+            color: #6a9955;
+        }
+        .error {
+            color: #f14c4c;
+        }
+        .data {
+            color: #4ec9b0;
+        }
+        button {
+            background-color: #0366d6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0256b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket连接测试</h1>
+        <div>
+            <button id="connectBtn">连接WebSocket</button>
+            <button id="requestModel1">请求模型1数据</button>
+            <button id="requestModel2">请求模型2数据</button>
+            <button id="disconnectBtn">断开连接</button>
+        </div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'system') {
+            const msgElement = document.createElement('div');
+            msgElement.className = `message ${type}`;
+            
+            // 对于对象，使用JSON.stringify格式化
+            if (typeof message === 'object') {
+                message = JSON.stringify(message, null, 2);
+            }
+            
+            msgElement.textContent = message;
+            output.appendChild(msgElement);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                log('WebSocket已经连接或正在连接中', 'error');
+                return;
+            }
+            
+            try {
+                ws = new WebSocket('ws://localhost:8765');
+                
+                ws.onopen = () => {
+                    log('WebSocket连接已建立');
+                };
+                
+                ws.onmessage = (event) => {
+                    log(`收到服务器消息: ${event.data}`);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'multi_model_data') {
+                            log(`收到模型数据: `, 'data');
+                            
+                            for (const [modelId, dataPoints] of Object.entries(data.data)) {
+                                log(`模型 ${modelId} 数据点数量: ${dataPoints.length}`, 'data');
+                                
+                                // 检查第一个数据点是否有错误标记
+                                if (dataPoints.length > 0) {
+                                    if (dataPoints[0].error) {
+                                        log(`模型 ${modelId} 报告错误: ${dataPoints[0].termination_reason}`, 'error');
+                                    } else {
+                                        log(`模型 ${modelId} 第一个数据点样例: ${JSON.stringify(dataPoints[0]).substring(0, 100)}...`, 'data');
+                                    }
+                                }
+                            }
+                        } else if (data.type === 'system_message') {
+                            log(`系统消息: ${data.content}`, 'system');
+                        }
+                    } catch (err) {
+                        log(`解析消息失败: ${err}`, 'error');
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    log(`WebSocket发生错误: ${error}`, 'error');
+                };
+                
+                ws.onclose = () => {
+                    log('WebSocket连接已关闭');
+                };
+            } catch (error) {
+                log(`创建WebSocket连接失败: ${error}`, 'error');
+            }
+        });
+        
+        document.getElementById('requestModel1').addEventListener('click', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket未连接，请先连接', 'error');
+                return;
+            }
+            
+            const message = JSON.stringify({
+                type: 'request_model_data',
+                model_id: '1'
+            });
+            
+            log(`发送请求: ${message}`);
+            ws.send(message);
+        });
+        
+        document.getElementById('requestModel2').addEventListener('click', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket未连接，请先连接', 'error');
+                return;
+            }
+            
+            const message = JSON.stringify({
+                type: 'request_model_data',
+                model_id: '2'
+            });
+            
+            log(`发送请求: ${message}`);
+            ws.send(message);
+        });
+        
+        document.getElementById('disconnectBtn').addEventListener('click', () => {
+            if (!ws) {
+                log('WebSocket未创建', 'error');
+                return;
+            }
+            
+            ws.close();
+            log('正在关闭WebSocket连接');
+        });
+        
+        log('页面加载完成，点击"连接WebSocket"按钮开始测试');
+    </script>
+</body>
+</html>

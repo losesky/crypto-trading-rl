@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket测试</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    button {
+      padding: 10px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+    #status {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .connected {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .disconnected {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .connecting {
+      background: #fff8e1;
+      color: #f57f17;
+    }
+    #messageLog {
+      border: 1px solid #ddd;
+      padding: 10px;
+      height: 300px;
+      overflow-y: auto;
+      margin: 10px 0;
+      font-family: monospace;
+      background: #f8f9fa;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 0.8em;
+    }
+    .error {
+      color: #c62828;
+    }
+    .success {
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WebSocket连接测试</h1>
+    
+    <div id="status" class="disconnected">未连接</div>
+    
+    <button id="connectBtn">连接到WebSocket服务器</button>
+    <button id="disconnectBtn" disabled>断开连接</button>
+    <button id="requestModel1Btn" disabled>请求模型1数据</button>
+    <button id="clearBtn">清空日志</button>
+    
+    <h2>消息日志</h2>
+    <div id="messageLog"></div>
+  </div>
+
+  <script>
+    // DOM元素
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const requestModel1Btn = document.getElementById('requestModel1Btn');
+    const clearBtn = document.getElementById('clearBtn');
+    const messageLog = document.getElementById('messageLog');
+    
+    // 全局WebSocket对象
+    let ws = null;
+    
+    // 添加日志
+    function log(message, type = 'info') {
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+      
+      const logEntry = document.createElement('div');
+      logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> <span class="${type}">${message}</span>`;
+      
+      messageLog.appendChild(logEntry);
+      messageLog.scrollTop = messageLog.scrollHeight; // 滚动到底部
+    }
+    
+    // 更新连接状态UI
+    function updateStatus(state) {
+      statusEl.className = state;
+      
+      switch(state) {
+        case 'connected':
+          statusEl.textContent = '已连接';
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          requestModel1Btn.disabled = false;
+          break;
+        case 'disconnected':
+          statusEl.textContent = '未连接';
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+          requestModel1Btn.disabled = true;
+          break;
+        case 'connecting':
+          statusEl.textContent = '连接中...';
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = true;
+          requestModel1Btn.disabled = true;
+          break;
+      }
+    }
+    
+    // 连接到WebSocket服务器
+    function connect() {
+      if (ws) {
+        log('已经有一个连接存在，请先断开', 'error');
+        return;
+      }
+      
+      updateStatus('connecting');
+      log('正在连接到 ws://localhost:8765...');
+      
+      try {
+        ws = new WebSocket('ws://localhost:8765');
+        
+        ws.onopen = function() {
+          log('连接成功!', 'success');
+          updateStatus('connected');
+        };
+        
+        ws.onmessage = function(event) {
+          log(`收到消息: ${event.data}`);
+          
+          try {
+            const message = JSON.parse(event.data);
+            log(`解析后的消息类型: ${message.type}`, 'success');
+          } catch (error) {
+            log(`无法解析消息: ${error.message}`, 'error');
+          }
+        };
+        
+        ws.onclose = function() {
+          log('连接已关闭');
+          updateStatus('disconnected');
+          ws = null;
+        };
+        
+        ws.onerror = function(error) {
+          log(`WebSocket错误: ${error}`, 'error');
+          updateStatus('disconnected');
+        };
+        
+      } catch (error) {
+        log(`创建WebSocket时出错: ${error.message}`, 'error');
+        updateStatus('disconnected');
+        ws = null;
+      }
+    }
+    
+    // 断开连接
+    function disconnect() {
+      if (!ws) {
+        log('没有活动连接', 'error');
+        return;
+      }
+      
+      log('正在关闭连接...');
+      ws.close();
+    }
+    
+    // 请求模型1数据
+    function requestModel1Data() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        log('WebSocket未连接，无法发送请求', 'error');
+        return;
+      }
+      
+      const message = {
+        type: 'request_model_data',
+        model_id: '1'
+      };
+      
+      log(`发送请求: ${JSON.stringify(message)}`);
+      ws.send(JSON.stringify(message));
+    }
+    
+    // 清空日志
+    function clearLog() {
+      messageLog.innerHTML = '';
+      log('日志已清空');
+    }
+    
+    // 注册事件处理
+    connectBtn.addEventListener('click', connect);
+    disconnectBtn.addEventListener('click', disconnect);
+    requestModel1Btn.addEventListener('click', requestModel1Data);
+    clearBtn.addEventListener('click', clearLog);
+    
+    // 初始化
+    log('页面已加载，准备连接WebSocket服务器');
+  </script>
+</body>
+</html>

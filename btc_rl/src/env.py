@@ -345,6 +345,13 @@ class BtcTradingEnv(gym.Env):
         info = {
             "margin_equity": self.margin_equity,
             "cash_balance": self.cash_balance,
+            "upnl": self.upnl,
+            "price": price,
+            "position_btc": self.position_btc, 
+            "buy_and_hold_equity": self.buy_and_hold_equity,
+            "total_fee": self.total_fee_paid,
+            "was_liquidated_this_step": self.was_liquidated_this_step,
+            "termination_reason": termination_reason,
             "bankrupt": terminated_by_bankruptcy and not terminated_by_liquidation,
             "liquidated": terminated_by_liquidation,
         }

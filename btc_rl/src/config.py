@@ -19,8 +19,8 @@ class Config:
             'default_exchange': 'binance',
             'default_symbol': 'BTC/USDT',
             'default_timeframe': '1h',
-            'default_train_start_date': '2018-01-01',
-            'default_test_start_date': '2022-01-01',
+            'default_train_start_date': '2025-05-01',
+            'default_test_start_date': '2025-06-05',
             'api_max_retries': '5',
             'api_retry_delay': '10',
             'api_use_exponential_backoff': 'true'
@@ -299,10 +299,26 @@ class Config:
             bool: 是否使用指数退避算法
         """
         return self.getboolean('data', 'api_use_exponential_backoff')
+    
+    def get_data_sampling_interval(self):
+        """获取数据采样间隔
+        
+        Returns:
+            int: 数据采样间隔（步数）
+        """
+        return self.getint('visualization', 'data_sampling_interval', fallback=2)
 
 
 # 创建全局配置实例
 config = Config()
+
+def get_config():
+    """获取全局配置实例
+    
+    Returns:
+        Config: 全局配置实例
+    """
+    return config
 
 if __name__ == "__main__":
     # 测试配置模块
@@ -319,3 +335,4 @@ if __name__ == "__main__":
     print(f"API最大重试次数: {cfg.get_api_max_retries()}")
     print(f"API重试延迟时间: {cfg.get_api_retry_delay()}")
     print(f"使用指数退避: {cfg.get_api_use_exponential_backoff()}")
+    print(f"数据采样间隔: {cfg.get_data_sampling_interval()}")

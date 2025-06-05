@@ -1,0 +1,2077 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTC交易模型比较</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js & annotation plug-in -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  
+  <!-- 引入控制台调试工具 -->
+  <script>
+    // 页面加载调试
+    console.log('页面开始加载...');
+    window.addEventListener('load', () => {
+      console.log('页面完全加载完成');
+    });
+    
+    // 错误处理
+    window.addEventListener('error', (event) => {
+      console.error('捕获到错误:', event.message, 'at', event.filename, ':', event.lineno);
+      document.body.innerHTML = `
+        <div style="max-width:800px; margin:2rem auto; padding:2rem; background:#fff1f2; border:1px solid #fecdd3; border-radius:0.5rem;">
+          <h2 style="color:#be123c; margin-top:0;">页面加载出错</h2>
+          <p><strong>错误信息:</strong> ${event.message}</p>
+          <p><strong>文件:</strong> ${event.filename}</p>
+          <p><strong>行号:</strong> ${event.lineno}</p>
+          <p style="margin-top:1.5rem;">请尝试刷新页面或检查控制台以获取更多信息。</p>
+        </div>
+      `;
+    });
+  </script>
+
+  <style>
+    :root {
+      --clr-bg-1: #0f172a;
+      --clr-bg-2: #1e293b;
+      --clr-card: rgba(255, 255, 255, 0.08);
+      --clr-card-border: rgba(255, 255, 255, 0.16);
+      --clr-text: #f1f5f9;
+      --clr-accent: #38bdf8;
+      --clr-success: #22c55e;
+      --clr-danger: #ef4444;
+      --clr-warning: #f59e0b;
+    }
+    
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background: linear-gradient(160deg, var(--clr-bg-1), var(--clr-bg-2));
+      color: var(--clr-text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+    
+    h1 {
+      font-weight: 700;
+      font-size: clamp(1.8rem, 2vw + 1rem, 2.4rem);
+      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    
+    .card {
+      background: var(--clr-card);
+      border: 1px solid var(--clr-card-border);
+      border-radius: 1rem;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 2rem;
+      padding: 1.5rem;
+    }
+    
+    .control-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .model-selection {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      max-height: 150px;
+      overflow-y: auto;
+      padding: 0.5rem;
+      margin-right: auto;
+      border-radius: 0.5rem;
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+    
+    .model-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.8rem;
+      border-radius: 0.4rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--clr-text);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    
+    .model-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .model-btn.active {
+      background: var(--clr-accent);
+      color: #0f172a;
+      border-color: var(--clr-accent);
+      font-weight: 600;
+    }
+    
+    .no-models-message {
+      padding: 1rem;
+      color: var(--clr-warning);
+      background-color: rgba(245, 158, 11, 0.1);
+      border: 1px dashed var(--clr-warning);
+      border-radius: 0.5rem;
+      width: 100%;
+    }
+    
+    .no-models-message p {
+      margin-bottom: 0.5rem;
+    }
+    
+    .no-models-message code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+    }
+    
+    .compare-btn {
+      padding: 0.6rem 1.2rem;
+      background: var(--clr-accent);
+      color: #0f172a;
+      border: none;
+      border-radius: 0.4rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .compare-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    
+    .compare-btn:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+      filter: none;
+      transform: none;
+    }
+    
+    .chart-wrapper {
+      width: 100%;
+      position: relative;
+    }
+    
+    .chart-wrapper + .chart-wrapper {
+      margin-top: 2rem;
+    }
+    
+    .chart-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    canvas {
+      width: 100% !important;
+      height: 400px !important;
+      margin-bottom: 1rem;
+    }
+    
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 2rem;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    
+    thead {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    th, td {
+      padding: 0.8rem 1rem;
+      text-align: right;
+    }
+    
+    th {
+      font-weight: 600;
+      text-align: center;
+    }
+    
+    tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    
+    .text-success {
+      color: var(--clr-success);
+    }
+    
+    .text-danger {
+      color: var(--clr-danger);
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top: 3px solid var(--clr-accent);
+      border-radius: 50%;
+      margin: 0 auto;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    body.loading {
+      pointer-events: none;
+    }
+    
+    body.loading .compare-btn {
+      background: #94a3b8;
+    }
+    
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .model-btn.loading span {
+      opacity: 0.7;
+    }
+    
+    .loading-indicator {
+      padding: 0.5rem;
+      color: var(--clr-text);
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <h1>BTC交易模型比较</h1>
+  
+  <div class="card">
+    <div class="control-panel">
+      <div id="modelSelection" class="model-selection">
+        <!-- 模型按钮将动态生成 -->
+        <div class="loading-indicator">
+          <span>正在加载模型列表...</span>
+        </div>
+      </div>
+      
+      <button id="compareBtn" class="compare-btn">比较所选模型</button>
+    </div>
+    
+    <div class="chart-wrapper">
+      <h3 class="chart-title">权益曲线比较</h3>
+      <canvas id="equityChart"></canvas>
+    </div>
+    
+    <div class="chart-wrapper">
+      <h3 class="chart-title">回撤比较</h3>
+      <canvas id="drawdownChart"></canvas>
+    </div>
+    
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th>最终权益</th>
+            <th>总收益率</th>
+            <th>最大回撤</th>
+            <th>夏普比率</th>
+            <th>索提诺比率</th>
+            <th>交易次数</th>
+            <th>胜率</th>
+          </tr>
+        </thead>
+        <tbody id="summaryTableBody">
+          <tr>
+            <td colspan="8" style="text-align:center;padding:2rem;">请选择模型并点击"比较所选模型"</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM内容加载完成，初始化应用...');
+      
+      // 工具函数
+      const $ = id => {
+        const element = document.getElementById(id);
+        if (!element) {
+          console.warn(`未找到ID为"${id}"的元素`);
+        }
+        return element;
+      };
+      
+      // 颜色配置 - 扩展支持更多模型
+      const MODEL_COLORS_ARRAY = [
+        '#38bdf8', // 蓝色
+        '#22c55e', // 绿色
+        '#f59e0b', // 橙色
+        '#8b5cf6', // 紫色
+        '#06b6d4', // 青色
+        '#ef4444', // 红色
+        '#ec4899', // 粉色
+        '#14b8a6', // 青绿色
+        '#a855f7', // 淡紫色
+        '#f97316', // 深橙色
+        '#eab308', // 黄色
+        '#84cc16', // 黄绿色
+        '#10b981', // 绿松石色
+        '#64748b', // 石板灰
+        '#6366f1', // 靛蓝色
+        '#8b5cf6', // 紫罗兰色
+        '#d946ef', // 洋红色
+        '#7c3aed', // 靛青色
+        '#2563eb', // 皇家蓝
+        '#0369a1'  // 深青色
+      ];
+      
+      // 动态生成模型颜色映射
+      const MODEL_COLORS = {};
+      for (let i = 1; i <= 20; i++) {
+        MODEL_COLORS[`model${i}`] = MODEL_COLORS_ARRAY[(i-1) % MODEL_COLORS_ARRAY.length];
+      }
+      
+      // 状态变量
+      let activeModels = ['model1']; // 默认激活第一个模型，使用let使其可以被更新
+      let equityChart = null;
+      let drawdownChart = null;
+      
+      // 模型数据 - 动态初始化
+      const modelData = {};
+      const modelNames = {};
+      
+      // 预初始化前20个模型以保障兼容性
+      for (let i = 1; i <= 20; i++) {
+        const modelKey = `model${i}`;
+        modelData[modelKey] = { equity: [], trades: [], drawdowns: [], stats: {} };
+        modelNames[modelKey] = `模型 ${i}`;
+      }
+      
+      // 请求获取模型列表
+      // 添加重试机制的模型列表请求函数
+      function requestModelList(callback, retryCount = 0, maxRetries = 3) {
+        console.log('正在请求模型列表...' + (retryCount > 0 ? `(第${retryCount}次重试)` : ''));
+        
+        // 获取加载指示器元素
+        const loadingIndicator = document.querySelector('.loading-indicator');
+        if (loadingIndicator) {
+          loadingIndicator.innerHTML = '<span>正在连接服务器获取模型列表...</span>';
+        }
+        
+        // 防止回调被多次调用
+        let callbackCalled = false;
+        const safeCallback = (success) => {
+          if (!callbackCalled && callback) {
+            callbackCalled = true;
+            callback(success);
+          }
+        };
+        
+        // 创建临时WebSocket连接
+        let ws;
+        try {
+          console.log('[WS] 尝试建立WebSocket连接到 ws://localhost:8765');
+          ws = new WebSocket('ws://localhost:8765');
+          
+          // 检测连接是否立即失败
+          setTimeout(() => {
+            if (ws && (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CONNECTING)) {
+              console.warn('WebSocket连接失败，状态:', ws.readyState);
+              if (retryCount < maxRetries) {
+                console.log(`连接失败，${retryCount+1}/${maxRetries} 次重试`);
+                // 延迟1秒后重试
+                setTimeout(() => requestModelList(callback, retryCount + 1, maxRetries), 1000);
+              } else {
+                if (loadingIndicator) {
+                  loadingIndicator.innerHTML = `<span style="color:#ef4444">连接服务器失败，已重试${maxRetries}次</span>
+                    <div style="margin-top:8px;">
+                      <button onclick="location.reload()" style="padding:4px 8px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;">
+                        刷新页面
+                      </button>
+                    </div>`;
+                }
+                safeCallback(false);
+              }
+            }
+          }, 1500);
+          
+        } catch (error) {
+          console.error('创建WebSocket连接失败:', error);
+          if (loadingIndicator) {
+            loadingIndicator.innerHTML = `<span style="color:#ef4444">连接服务器失败: ${error.message}</span>`;
+          }
+          
+          // 如果还有重试次数，则尝试重试
+          if (retryCount < maxRetries) {
+            console.log(`连接异常，${retryCount+1}/${maxRetries} 次重试`);
+            // 延迟1秒后重试
+            setTimeout(() => requestModelList(callback, retryCount + 1, maxRetries), 1000);
+            return;
+          }
+          
+          safeCallback(false);
+          return;
+        }
+        
+        // 设置超时
+        const timeout = setTimeout(() => {
+          console.warn('请求模型列表超时');
+          
+          try {
+            ws.close(1000, "请求超时");
+          } catch (e) {
+            console.error("关闭WebSocket连接时出错:", e);
+          }
+          
+          if (loadingIndicator) {
+            loadingIndicator.innerHTML = `<span style="color:#ef4444">连接超时，请检查服务器是否运行</span>
+              <div style="margin-top:8px;">
+                <button onclick="location.reload()" style="padding:4px 8px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;">
+                  刷新页面
+                </button>
+              </div>`;
+          }
+          
+          safeCallback(false);
+        }, 10000); // 增加超时时间到10秒，给服务器更充分的时间
+        
+        ws.addEventListener('open', () => {
+          console.log('[WS] 已连接，发送模型列表请求');
+          if (loadingIndicator) {
+            loadingIndicator.innerHTML = '<span>已连接，正在获取模型列表...</span>';
+          }
+          ws.send(JSON.stringify({ type: 'request_model_list' }));
+        });
+        
+        ws.addEventListener('message', e => {
+          clearTimeout(timeout);
+          try {
+            console.log('[WS] 收到消息:', e.data.length < 200 ? e.data : e.data.substring(0, 200) + '...');
+            
+            // 先检查数据是否为空
+            if (!e.data) {
+              console.error('收到空WebSocket消息');
+              if (loadingIndicator) {
+                loadingIndicator.innerHTML = `<span style="color:#ef4444">收到空数据响应</span>`;
+              }
+              return;
+            }
+            
+            const message = JSON.parse(e.data);
+            console.log('解析后的WebSocket消息:', message);
+            
+            if (message.type === 'model_list') {
+              console.log('收到模型列表数据:', message.data);
+              
+              // 清空现有的模型按钮容器
+              const modelSelectionEl = document.getElementById('modelSelection');
+              if (modelSelectionEl) {
+                modelSelectionEl.innerHTML = '';
+              } else {
+                console.error('未找到modelSelection元素');
+                // 安全地关闭WebSocket并返回错误
+                ws.close();
+                if (callback) callback(false);
+                return;
+              }
+              
+              // 动态生成模型按钮
+              if (Array.isArray(message.data)) {
+                if (message.data.length === 0) {
+                  // 无可用模型时显示提示信息
+                  const noModelsMsg = document.createElement('div');
+                  noModelsMsg.className = 'no-models-message';
+                  noModelsMsg.innerHTML = `
+                    <p>未找到任何模型。请确保 btc_rl/models/ 目录中有训练好的模型文件(.zip)。</p>
+                    <p>您可以运行训练脚本生成模型: <code>python -m btc_rl.src.train_sac</code></p>
+                  `;
+                  modelSelectionEl.appendChild(noModelsMsg);
+                } else {
+                  // 将当前活跃模型设置为第一个
+                  // 更安全地处理activeModels数组
+                  try {
+                    // 检查收到的模型列表数据有效性
+                    if (!Array.isArray(message.data) || message.data.length === 0) {
+                      console.warn('收到空模型列表或非数组数据:', message.data);
+                      // 不修改activeModels，保留原有的值
+                      return;
+                    }
+                    
+                    // 记录之前的活跃模型，以便比较变化
+                    const prevActiveModels = [...activeModels];
+                    
+                    // 清空数组的安全方法
+                    while (activeModels.length > 0) {
+                      activeModels.pop();
+                    }
+                    
+                    // 添加新元素 - 验证模型数据格式
+                    if (message.data[0] && (message.data[0].id || message.data[0].id === 0)) {
+                      const modelId = 'model' + message.data[0].id;
+                      activeModels.push(modelId);
+                      console.log('设置活跃模型为:', modelId, '原来的模型:', prevActiveModels);
+                    } else {
+                      // 如果格式不正确，查找任何有效ID
+                      const validModel = message.data.find(m => m && (m.id || m.id === 0));
+                      if (validModel) {
+                        activeModels.push('model' + validModel.id);
+                        console.log('找到有效模型ID:', validModel.id);
+                      } else {
+                        console.error('所有模型数据格式不正确:', message.data);
+                        // 添加默认值
+                        activeModels.push('model1');
+                      }
+                    }
+                    
+                    console.log('活跃模型已更新为:', activeModels);
+                  } catch (err) {
+                    console.error('更新activeModels时出错:', err, '错误堆栈:', err.stack);
+                    // 恢复到安全状态
+                    activeModels.length = 0;
+                    activeModels.push('model1');
+                  }
+                  
+                  // 有模型时创建按钮
+                  message.data.forEach((model, index) => {
+                    if (model.id && model.name) {
+                      const modelKey = 'model' + model.id;
+                      modelNames[modelKey] = model.name;
+                      
+                      // 创建新按钮
+                      const btn = document.createElement('button');
+                      btn.className = 'model-btn' + (index === 0 ? ' active' : '');
+                      btn.setAttribute('data-model', modelKey);
+                      
+                      const span = document.createElement('span');
+                      span.textContent = model.name;
+                      btn.appendChild(span);
+                      
+                      // 添加点击事件
+                      btn.addEventListener('click', function() {
+                        this.classList.toggle('active');
+                        
+                        // 更新activeModels数组
+                        const modelId = this.getAttribute('data-model');
+                        if (this.classList.contains('active')) {
+                          // 添加到活跃模型
+                          if (!activeModels.includes(modelId)) {
+                            activeModels.push(modelId);
+                          }
+                        } else {
+                          // 从活跃模型移除，但保留至少一个活跃模型
+                          if (activeModels.length > 1) {
+                            const index = activeModels.indexOf(modelId);
+                            if (index > -1) {
+                              activeModels.splice(index, 1);
+                            }
+                          } else {
+                            // 如果试图移除最后一个模型，重新激活它
+                            this.classList.add('active');
+                          }
+                        }
+                        
+                        console.log('更新活跃模型列表:', activeModels);
+                      });
+                      
+                      // 添加到容器
+                      modelSelectionEl.appendChild(btn);
+                    }
+                  });
+                  
+                  console.log('成功加载模型列表，共', message.data.length, '个模型');
+                }
+                
+                // 先调用回调，表示模型列表获取成功
+                safeCallback(true);
+                
+                // 清除超时计时器，防止超时触发
+                clearTimeout(timeout);
+                
+                // 延迟3秒后再关闭WebSocket，给服务器端足够的处理时间
+                // 这样可以确保我们在处理完其他可能的后续消息后再关闭连接
+                setTimeout(() => {
+                  // 安全关闭WebSocket
+                  try {
+                    if (ws) {
+                      if (ws.readyState === WebSocket.OPEN) {
+                        console.log('[WS] 正常关闭请求模型列表的WebSocket连接');
+                        // 先发送一个结束信息，告知服务器我们将关闭
+                        try {
+                          ws.send(JSON.stringify({ type: "client_close", reason: "模型列表请求完成" }));
+                        } catch (e) {
+                          console.warn('发送关闭通知失败:', e);
+                        }
+                        
+                        // 然后延迟500ms再关闭连接，确保消息发送完成
+                        setTimeout(() => {
+                          ws.close(1000, "模型列表请求完成"); // 使用正常关闭代码
+                        }, 500);
+                      } else if (ws.readyState === WebSocket.CONNECTING) {
+                        // 如果仍在连接中，等待连接建立后再关闭
+                        console.log('[WS] 连接仍在建立中，等待建立后关闭');
+                        ws.addEventListener('open', () => {
+                          setTimeout(() => ws.close(1000, "模型列表请求完成"), 500);
+                        }, { once: true });
+                      }
+                    }
+                  } catch (err) {
+                    console.warn('关闭WebSocket时出错:', err);
+                  }
+                }, 3000);
+              }
+            } else {
+              // 忽略其他类型的消息
+              console.log('忽略非模型列表消息:', message.type);
+            }
+          } catch (error) {
+            console.error('处理模型列表消息时出错:', error);
+            
+            if (loadingIndicator) {
+              loadingIndicator.innerHTML = `<span style="color:#ef4444">处理数据出错: ${error.message}</span>`;
+            }
+            
+            // 记录错误信息，帮助调试
+            console.error('错误详细信息:', {
+              message: error.message,
+              stack: error.stack,
+              name: error.name
+            });
+            
+            // 尝试显示更多诊断信息
+            const modelSelectionEl = document.getElementById('modelSelection');
+            if (modelSelectionEl) {
+              const errorDetails = document.createElement('div');
+              errorDetails.className = 'error-details';
+              errorDetails.innerHTML = `
+                <p>错误类型: ${error.name}</p>
+                <p>错误消息: ${error.message}</p>
+                <p>如果问题持续存在，请尝试刷新页面或重启服务器</p>
+              `;
+              
+              // 确保先清空容器
+              if (loadingIndicator && loadingIndicator.parentNode === modelSelectionEl) {
+                modelSelectionEl.removeChild(loadingIndicator);
+              }
+              
+              modelSelectionEl.appendChild(errorDetails);
+            }
+            
+            // 安全关闭WebSocket
+            try {
+              ws.close();
+            } catch (err) {
+              console.warn('关闭WebSocket时出错:', err);
+            }
+            
+            if (callback) callback(false);
+          }
+        });
+        
+        ws.addEventListener('error', (event) => {
+          clearTimeout(timeout);
+          console.error('请求模型列表时WebSocket错误:', event);
+          
+          if (loadingIndicator) {
+            loadingIndicator.innerHTML = `<span style="color:#ef4444">连接错误，请检查服务器</span>`;
+          }
+          
+          // 不要立即调用回调，等待close事件
+          // 因为error事件后一般会触发close事件
+        });
+        
+        ws.addEventListener('close', (event) => {
+          clearTimeout(timeout);
+          console.log('[WS] 模型列表请求连接已关闭，代码:', event.code, '原因:', event.reason || '未提供');
+          
+          // 检查是否已经收到并处理了模型列表
+          // 如果modelSelection中有内容，说明已经成功处理了模型列表
+          const modelSelectionEl = document.getElementById('modelSelection');
+          const alreadyProcessed = modelSelectionEl && 
+                                  (modelSelectionEl.children.length > 0) && 
+                                  !modelSelectionEl.querySelector('.loading-indicator');
+          
+          // 如果已经处理了模型列表，则认为成功
+          if (alreadyProcessed) {
+            console.log('WebSocket连接关闭，但模型列表已成功处理');
+            // 防止重复调用回调函数
+            if (callback && typeof callback === 'function') {
+              const temp = callback;
+              callback = null;  // 清空回调引用，确保只调用一次
+              temp(true);
+            }
+            return;
+          }
+          
+          // 对于不同类型的关闭代码进行区分处理
+          if (event.code === 1000 || event.code === 1001) {
+            // 正常关闭
+            console.log('WebSocket正常关闭');
+            // 如果模型选择元素为空，可能是没有模型可用
+            if (modelSelectionEl && modelSelectionEl.children.length === 0) {
+              const noModelsMsg = document.createElement('div');
+              noModelsMsg.className = 'no-models-message';
+              noModelsMsg.innerHTML = `
+                <p>服务器未返回任何模型。请确保 btc_rl/models/ 目录中有训练好的模型文件(.zip)。</p>
+              `;
+              modelSelectionEl.appendChild(noModelsMsg);
+            }
+          } else {
+            // 异常关闭
+            console.error('WebSocket连接异常关闭，代码:', event.code);
+            
+            // 如果loadingIndicator仍在显示"正在..."的状态，则更新为错误状态
+            if (loadingIndicator && loadingIndicator.textContent && loadingIndicator.textContent.includes('正在')) {
+              loadingIndicator.innerHTML = `<span style="color:#ef4444">连接意外关闭 (代码:${event.code})</span>`;
+              
+              // 添加重试按钮
+              const retryButton = document.createElement('button');
+              retryButton.innerText = '重试连接';
+              retryButton.className = 'retry-button';
+              retryButton.style.cssText = 'margin-top:10px;padding:5px 10px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;';
+              retryButton.onclick = () => {
+                if (modelSelectionEl) {
+                  modelSelectionEl.innerHTML = '<div class="loading-indicator"><span>正在重新连接...</span></div>';
+                  setTimeout(() => requestModelList((success) => {
+                    if (success && callback) callback(true);
+                  }), 500);
+                }
+              };
+              loadingIndicator.appendChild(retryButton);
+            }
+            
+            // 只有在异常关闭且回调未被调用过的情况下才调用回调
+            if (callback && typeof callback === 'function') {
+              const temp = callback;
+              callback = null;  // 清空回调引用，确保只调用一次
+              temp(false);
+            }
+          }
+        });
+      }
+      
+      // 初始化图表
+      function initCharts() {
+        // 销毁已存在的图表
+        if (equityChart) equityChart.destroy();
+        if (drawdownChart) drawdownChart.destroy();
+        
+        // 初始化权益曲线图表
+        equityChart = new Chart($('equityChart'), {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: []
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animations: false,
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: {
+                  color: 'rgba(255, 255, 255, 0.8)'
+                }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            }
+          }
+        });
+        
+        // 初始化回撤图表
+        drawdownChart = new Chart($('drawdownChart'), {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: []
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animations: false,
+            scales: {
+              x: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.7)'
+                }
+              },
+              y: {
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.05)'
+                },
+                ticks: {
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  reverse: true
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: {
+                  color: 'rgba(255, 255, 255, 0.8)'
+                }
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            }
+          }
+        });
+      }
+      
+      function fetchModelData() {
+        console.log('开始请求模型数据，当前活跃模型:', activeModels);
+        
+        // 检查是否有活跃模型
+        if (!Array.isArray(activeModels) || activeModels.length === 0) {
+          console.error('活跃模型列表无效:', activeModels);
+          alert('没有可用的模型，请刷新页面重试');
+          
+          // 尝试从DOM恢复活跃模型列表
+          try {
+            const activeButtons = document.querySelectorAll('.model-btn.active');
+            if (activeButtons && activeButtons.length > 0) {
+              // 重建activeModels数组
+              activeModels = Array.from(activeButtons).map(btn => btn.getAttribute('data-model'));
+              console.log('从DOM恢复活跃模型列表:', activeModels);
+              
+              // 如果恢复成功，继续执行
+              if (activeModels.length > 0) {
+                console.log('成功恢复活跃模型列表，继续执行');
+              } else {
+                return; // 仍然没有模型，退出
+              }
+            } else {
+              return; // 没有找到活跃按钮，退出
+            }
+          } catch (err) {
+            console.error('尝试恢复活跃模型列表时出错:', err);
+            return;
+          }
+        }
+        
+        // 显示加载状态
+        document.body.classList.add('loading');
+        
+        // 更新比较按钮状态
+        const compareBtn = $('compareBtn');
+        compareBtn.disabled = true;
+        compareBtn.innerText = '加载中...';
+        
+        // 清空当前数据
+        activeModels.forEach(modelId => {
+          modelData[modelId] = { 
+            equity: [], 
+            trades: [], 
+            drawdowns: [],
+            stats: {}
+          };
+        });
+        
+        // 清空摘要表并显示加载中
+        const tbody = $('summaryTableBody');
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align:center;padding:2rem;">
+              <div class="loading-spinner"></div>
+              <div style="margin-top:1rem;">正在加载模型数据...</div>
+            </td>
+          </tr>
+        `;
+        
+        // 初始化连接状态提示
+        const createStatusElement = () => {
+          // 如果已存在则移除
+          const existingStatus = document.querySelector('.connection-status');
+          if (existingStatus) {
+            existingStatus.remove();
+          }
+          
+          // 创建新的状态提示
+          const statusEl = document.createElement('div');
+          statusEl.className = 'connection-status';
+          statusEl.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+          `;
+          document.body.appendChild(statusEl);
+          return statusEl;
+        };
+        
+        const statusEl = createStatusElement();
+        statusEl.innerHTML = `
+          <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>
+          <span>连接中...</span>
+        `;
+        
+        // 初始化图表，显示空白状态
+        updateCharts();
+        
+        // 从WebSocket获取数据
+        let ws;
+        try {
+          console.log('[WS] 尝试连接WebSocket服务器...');
+          ws = new WebSocket('ws://localhost:8765');
+          
+          // 记录WebSocket实例的创建时间
+          const wsCreationTime = new Date().getTime();
+          
+          // 添加错误事件监听器
+          ws.addEventListener('error', (error) => {
+            console.error('[WS] WebSocket连接错误:', error);
+            statusEl.innerHTML = `
+              <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+              <span>WebSocket错误: 请检查服务器</span>
+            `;
+            compareBtn.disabled = false;
+            compareBtn.innerText = '重试连接';
+            document.body.classList.remove('loading');
+          });
+          
+          // 添加关闭事件监听器
+          ws.addEventListener('close', (event) => {
+            const connectionDuration = new Date().getTime() - wsCreationTime;
+            console.log(
+              '[WS] WebSocket连接已关闭',
+              '代码:', event.code, 
+              '原因:', event.reason,
+              '连接持续了', (connectionDuration / 1000).toFixed(2), '秒'
+            );
+            
+            // 如果连接持续时间很短且没有收到数据，可能是出现了问题
+            if (connectionDuration < 1000 && !dataReceived) {
+              console.warn('[WS] WebSocket连接过早关闭，没有收到任何数据');
+              statusEl.innerHTML = `
+                <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                <span>连接异常关闭: 请检查服务器并确认模型文件存在</span>
+              `;
+              
+              // 更新界面状态
+              compareBtn.disabled = false;
+              compareBtn.innerText = '重试连接';
+              document.body.classList.remove('loading');
+              
+              // 显示错误信息
+              tbody.innerHTML = `
+                <tr>
+                  <td colspan="8" style="text-align:center;padding:2rem;">
+                    <div style="color:#ef4444">连接异常关闭，未收到数据</div>
+                    <div style="margin-top:0.5rem;font-size:0.9rem;">
+                      请检查服务器日志并确认模型文件存在<br>
+                      <code>服务器连接关闭，代码: ${event.code}</code>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            } else {
+              // 正常关闭或已经收到了一些数据
+              statusEl.innerHTML = `
+                <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>
+                <span>连接已关闭</span>
+              `;
+              
+              setTimeout(() => {
+                statusEl.style.opacity = '0';
+              }, 2000);
+            }
+          });
+        } catch (error) {
+          console.error('[WS] 创建WebSocket连接时出错:', error);
+          statusEl.innerHTML = `
+            <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+            <span>连接失败: ${error.message}</span>
+          `;
+          compareBtn.disabled = false;
+          compareBtn.innerText = '重试连接';
+          document.body.classList.remove('loading');
+          return;
+        }
+        
+        // 设置连接超时
+        const connectionTimeout = setTimeout(() => {
+          if (ws && ws.readyState !== 1) { // 如果不是OPEN状态
+            statusEl.innerHTML = `
+              <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+              <span>连接超时，请检查服务器</span>
+            `;
+            try {
+              ws.close();
+            } catch (err) {
+              console.warn('关闭超时WebSocket时出错:', err);
+            }
+            
+            compareBtn.disabled = false;
+            compareBtn.innerText = '重试连接';
+            document.body.classList.remove('loading');
+            
+            // 显示超时信息
+            const tbody = $('summaryTableBody');
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="8" style="text-align:center;padding:2rem;">
+                  <div style="color:#ef4444">连接超时</div>
+                  <div style="margin-top:0.5rem;font-size:0.9rem;">
+                    请检查服务器是否正在运行，并确认WebSocket端口(8765)可访问
+                  </div>
+                </td>
+              </tr>
+            `;
+          }
+        }, 8000); // 增加超时时间到8秒
+        
+        ws.addEventListener('open', () => {
+          clearTimeout(connectionTimeout);
+          
+          statusEl.innerHTML = `
+            <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+            <span>已连接服务器</span>
+          `;
+          
+          console.log('[WS] 已连接到服务器');
+          
+          // 检查是否有活跃模型
+          if (!activeModels || activeModels.length === 0) {
+            console.warn('没有选择任何模型, 默认选择模型1');
+            activeModels = ['model1']; // 默认使用模型1
+          }
+          
+          // 优化：一次性请求所有选定模型的数据
+          const modelIndices = activeModels.map(modelId => modelId.replace('model', ''));
+          
+          if (modelIndices.length > 0) {
+            // 批量请求所有模型数据
+            try {
+              const message = JSON.stringify({
+                type: 'request_multi_model_data',
+                model_ids: modelIndices
+              });
+              console.log('[WS] 批量请求模型数据: ' + modelIndices.join(', '));
+              ws.send(message);
+              
+              // 设置请求发送标记
+              window.requestSent = true;
+              console.log('[WS] 模型数据请求已发送');
+              
+              // 3秒后如果还没有收到数据，显示等待信息
+              setTimeout(() => {
+                if (!dataReceived) {
+                  statusEl.innerHTML = `
+                    <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>
+                    <span>正在等待模型数据，请稍候...</span>
+                  `;
+                }
+              }, 3000);
+            } catch (error) {
+              console.error('[WS] 发送请求时出错:', error);
+              statusEl.innerHTML = `
+                <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                <span>发送请求失败: ${error.message}</span>
+              `;
+              
+              // 更新界面状态
+              compareBtn.disabled = false;
+              compareBtn.innerText = '重试连接';
+              document.body.classList.remove('loading');
+            }
+          } else {
+            console.error('没有有效的模型ID');
+            statusEl.innerHTML = `
+              <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+              <span>没有有效的模型ID</span>
+            `;
+            
+            // 更新界面状态
+            compareBtn.disabled = false;
+            compareBtn.innerText = '重试连接';
+            document.body.classList.remove('loading');
+          }
+        });
+        
+        // 数据处理状态管理  
+        let dataReceived = false;
+        let dataUpdateTimer = null;
+        let updatesCount = 0;
+        const MAX_UPDATES_WAIT = 30; // 增加等待时间，最多等待30次更新
+        
+        // 模型数据接收跟踪
+        const receivedModels = {};
+        activeModels.forEach(modelId => {
+          receivedModels[modelId] = false;
+        });
+        
+        // 优化的数据更新函数
+        const batchUpdates = () => {
+          if (dataReceived) {
+            console.log("处理收到的数据更新...");
+            
+            // 跟踪已成功加载数据的模型数量
+            let validModelsCount = 0;
+            let processedModels = new Set();
+            
+            // 首先检查活跃模型
+            activeModels.forEach(modelId => {
+              // 确保此模型有数据对象
+              if (!modelData[modelId]) {
+                modelData[modelId] = { equity: [], trades: [], drawdowns: [], stats: {} };
+              }
+              
+              // 即使模型有错误，也将其视为有效数据，因为我们需要显示错误信息
+              const hasEquity = Array.isArray(modelData[modelId].equity) && modelData[modelId].equity.length > 0;
+              const hasError = modelData[modelId].error === true;
+              
+              if (hasEquity || hasError) {
+                validModelsCount++;
+                receivedModels[modelId] = true;
+                processedModels.add(modelId);
+                
+                if (hasError) {
+                  console.log('模型 ' + modelId + ' 有错误数据: ' + (modelData[modelId].errorMessage || "未知错误"));
+                } else {
+                  console.log('模型 ' + modelId + ' 有有效的权益数据，共 ' + modelData[modelId].equity.length + ' 条');
+                }
+                
+                // 如果有权益数据，确保相关数据完整
+                if (hasEquity) {
+                  // 只有当 stats 属性不存在且没有错误时才生成临时统计数据
+                  if (!modelData[modelId].stats || Object.keys(modelData[modelId].stats).length === 0) {
+                    console.log('为模型 ' + modelId + ' 初始化统计数据占位符');
+                    const equity = modelData[modelId].equity;
+                    const initialValue = equity[0] || 10000;
+                    const finalValue = equity[equity.length - 1] || initialValue;
+                    
+                    // 计算最大回撤
+                    let maxDrawdown = 0;
+                    try {
+                      maxDrawdown = calculateMaxDrawdown(equity);
+                    } catch(err) {
+                      console.error('计算最大回撤出错:', err);
+                    }
+                    
+                    modelData[modelId].stats = {
+                      final_equity: finalValue,
+                      total_return: (finalValue - initialValue) / initialValue,
+                      max_drawdown: maxDrawdown,
+                      sharpe_ratio: 0.0,  // 设置为0，表示暂未计算
+                      sortino_ratio: 0.0, // 设置为0，表示暂未计算
+                      total_trades: 0,    // 设置为0，表示暂未计算
+                      win_rate: 0.0       // 设置为0，表示暂未计算
+                    };
+                  }
+                  
+                  // 如果有权益数据但没有回撤数据，生成回撤数据
+                  if (!modelData[modelId].drawdowns || modelData[modelId].drawdowns.length === 0) {
+                    console.log('为模型 ' + modelId + ' 生成回撤数据');
+                    modelData[modelId].drawdowns = generateDrawdownsFromEquity(modelData[modelId].equity);
+                  } 
+                  // 如果回撤数据点数少于权益数据点数，补齐回撤数据
+                  else if (modelData[modelId].drawdowns.length < modelData[modelId].equity.length) {
+                    console.log('为模型 ' + modelId + ' 补充缺失的回撤数据');
+                    const missingCount = modelData[modelId].equity.length - modelData[modelId].drawdowns.length;
+                    
+                    // 生成新的回撤数据
+                    const newDrawdowns = generateDrawdownsFromEquity(
+                      modelData[modelId].equity.slice(-missingCount-5)  // 取最后几个权益点计算回撤
+                    ).slice(-missingCount);  // 只取我们需要的部分
+                    
+                    // 添加到现有回撤数据中
+                    modelData[modelId].drawdowns.push(...newDrawdowns);
+                  }
+                }
+              }
+            });
+            
+            // 当有任何模型数据有效，立即更新UI显示
+            if (validModelsCount > 0 || processedModels.size > 0) {
+              console.log(`有 ${validModelsCount}/${activeModels.length} 个活跃模型数据已加载`);
+              
+              try {
+                updateSummaryTable();
+                updateCharts();
+                
+                // 在状态栏显示加载进度
+                statusEl.style.opacity = '1';
+                statusEl.innerHTML = `
+                  <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+                  <span>已加载 ${validModelsCount}/${activeModels.length} 个模型数据</span>
+                `;
+                
+                // 所有活跃模型都加载完成，或者达到等待次数上限时，恢复界面状态
+                if (validModelsCount === activeModels.length || updatesCount >= MAX_UPDATES_WAIT) {
+                  compareBtn.disabled = false;
+                  compareBtn.innerText = '更新数据';
+                  document.body.classList.remove('loading');
+                  dataReceived = false;
+                  updatesCount = 0;
+                  
+                  // 如果全部加载完成，2秒后隐藏状态栏
+                  if (validModelsCount === activeModels.length) {
+                    setTimeout(() => {
+                      statusEl.style.opacity = '0';
+                    }, 2000);
+                  }
+                } else {
+                  // 继续等待其他模型数据
+                  updatesCount++;
+                  dataUpdateTimer = setTimeout(batchUpdates, 1000);
+                }
+              } catch (err) {
+                console.error("更新图表或摘要表失败:", err);
+                statusEl.innerHTML = `
+                  <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                  <span>更新图表失败: ${err.message}</span>
+                `;
+                compareBtn.disabled = false;
+                compareBtn.innerText = '重试';
+                document.body.classList.remove('loading');
+              }
+            } else {
+              updatesCount++;
+              if (updatesCount >= MAX_UPDATES_WAIT) {
+                // 等待超时，显示错误并恢复界面状态
+                console.warn("等待数据超时，未收到有效模型数据");
+                
+                statusEl.style.opacity = '1';
+                statusEl.innerHTML = `
+                  <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                  <span>未收到有效数据，请重试</span>
+                `;
+                
+                compareBtn.disabled = false;
+                compareBtn.innerText = '重试连接';
+                document.body.classList.remove('loading');
+                
+                const tbody = $('summaryTableBody');
+                tbody.innerHTML = `
+                  <tr>
+                    <td colspan="8" style="text-align:center;padding:2rem;">
+                      <div style="color:#ef4444">未收到有效数据</div>
+                      <div style="margin-top:0.5rem;font-size:0.9rem;">请检查模型文件和服务器连接后重试</div>
+                    </td>
+                  </tr>
+                `;
+                
+                dataReceived = false;
+                updatesCount = 0;
+              } else {
+                // 继续等待更多数据
+                dataUpdateTimer = setTimeout(batchUpdates, 1000);
+              }
+            }
+          }
+        };
+        
+        ws.addEventListener('message', e => {
+          try {
+            console.log('[WS] 收到消息长度:', e.data.length, '开头内容:', e.data.substring(0, 200) + (e.data.length > 200 ? '...' : ''));
+            const message = JSON.parse(e.data);
+            
+            // 处理系统消息
+            if (message.type === 'system_message') {
+              if (message.content) {
+                statusEl.style.opacity = '1';
+                statusEl.innerHTML = `
+                  <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>
+                  <span>${message.content}</span>
+                `;
+                
+                setTimeout(() => {
+                  statusEl.style.opacity = '0';
+                }, 3000);
+              }
+              return;
+            }
+            
+            // 处理模型列表
+            if (message.type === 'model_list') {
+              console.log('[WS] 收到模型列表:', message.data);
+              if (Array.isArray(message.data)) {
+                message.data.forEach(model => {
+                  if (model.id && model.name) {
+                    const modelKey = 'model' + model.id;
+                    modelNames[modelKey] = model.name;
+                    // 更新按钮显示
+                    const btn = document.querySelector('.model-btn[data-model="' + modelKey + '"]');
+                    if (btn) {
+                      const span = btn.querySelector('span');
+                      if (span) span.textContent = model.name;
+                    }
+                  }
+                });
+              }
+            }
+            
+            // 处理模型数据
+            if (message.type === 'model_data') {
+              const modelId = `model${message.model_id}`;
+              if (activeModels.includes(modelId)) {
+                processModelData(modelId, message.data);
+                dataReceived = true;
+              }
+            } 
+            // 处理多模型批量数据
+            else if (message.type === 'multi_model_data') {
+              console.log('[WS] 收到多模型数据，键:', Object.keys(message.data));
+              
+              // 验证数据结构
+              if (!message.data || typeof message.data !== 'object') {
+                console.error('[WS] 多模型数据格式错误：', message.data);
+                statusEl.innerHTML = `
+                  <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                  <span>数据格式错误: 无效的数据结构</span>
+                `;
+                return;
+              }
+              
+              try {
+                for (const [modelId, dataArray] of Object.entries(message.data)) {
+                  const modelKey = `model${modelId}`;
+                  // 即使模型不在活跃列表中，也尝试处理数据(可能是先加载数据后选择模型的情况)
+                  console.log(`[WS] 处理模型 ${modelKey} 数据，共 ${Array.isArray(dataArray) ? dataArray.length : '未知'} 条`);
+                  
+                  if (Array.isArray(dataArray) && dataArray.length > 0) {
+                    dataArray.forEach(dataPoint => {
+                      processModelData(modelKey, dataPoint);
+                    });
+                    // 如果是活跃模型，标记为已收到数据
+                    if (activeModels.includes(modelKey)) {
+                      dataReceived = true;
+                    }
+                  } else {
+                    console.warn(`[WS] 模型 ${modelKey} 返回的数据不是数组或为空`);
+                    // 标记为错误，以便UI显示
+                    if (!modelData[modelKey]) {
+                      modelData[modelKey] = { equity: [], trades: [], drawdowns: [], stats: {} };
+                    }
+                    modelData[modelKey].error = true;
+                    modelData[modelKey].errorMessage = "服务器返回的数据无效或为空";
+                    
+                    // 如果是活跃模型，也标记为已收到数据(哪怕是错误数据)
+                    if (activeModels.includes(modelKey)) {
+                      dataReceived = true;
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error('[WS] 处理多模型数据时出错:', err);
+                statusEl.innerHTML = `
+                  <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                  <span>处理模型数据出错: ${err.message}</span>
+                `;
+                // 尽管出错，我们也标记为收到了数据，以便更新UI
+                dataReceived = true;
+              }
+            } else {
+              console.log('[WS] 收到未知类型消息:', message.type);
+            }
+            
+            // 使用防抖更新UI，避免频繁重绘
+            if (dataReceived) {
+              if (dataUpdateTimer) clearTimeout(dataUpdateTimer);
+              dataUpdateTimer = setTimeout(batchUpdates, 300);
+            }
+            
+          } catch (err) {
+            console.error('解析消息出错:', err, '消息内容:', e.data.substring(0, 500));
+            statusEl.innerHTML = `
+              <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+              <span>数据解析错误: ${err.message}</span>
+            `;
+          }
+        });
+        
+        // 连接断开处理
+        ws.addEventListener('close', (event) => {
+          clearTimeout(connectionTimeout);
+          console.log('[WS] 连接已关闭，代码:', event.code, '原因:', event.reason);
+          
+          statusEl.style.opacity = '1';
+          
+          // 如果是异常关闭
+          if (event.code !== 1000) { // 非正常关闭
+            statusEl.innerHTML = `
+              <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+              <span>连接异常关闭: 代码 ${event.code}</span>
+            `;
+            
+            // 尝试重连
+            console.log('[WS] 尝试自动重连...');
+            
+            // 如果我们已经收到了一些数据，那么就静默重连
+            if (dataReceived) {
+              // 静默重连
+              setTimeout(() => {
+                try {
+                  console.log('[WS] 静默重连中...');
+                  
+                  // 重新初始化WebSocket连接
+                  ws = new WebSocket('ws://localhost:8765');
+                  
+                  // 绑定相同的事件处理器
+                  ws.addEventListener('error', error => {
+                    console.error('[WS] 重连失败:', error);
+                    statusEl.innerHTML = `
+                      <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                      <span>重连失败: 请手动重试</span>
+                    `;
+                  });
+                  
+                  // 处理成功连接
+                  ws.addEventListener('open', () => {
+                    console.log('[WS] 重连成功');
+                    statusEl.innerHTML = `
+                      <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+                      <span>已重新连接</span>
+                    `;
+                    
+                    setTimeout(() => {
+                      statusEl.style.opacity = '0';
+                    }, 2000);
+                    
+                    // 重新发送活跃的模型请求
+                    if (activeModels.length > 0) {
+                      console.log('[WS] 重新请求活跃模型:', activeModels);
+                      const modelIndices = activeModels.map(model => model.replace('model', ''));
+                      const message = JSON.stringify({
+                        type: 'request_multi_model_data',
+                        model_ids: modelIndices
+                      });
+                      ws.send(message);
+                    }
+                  });
+                  
+                  // 重新绑定消息和关闭事件处理器 
+                  // (这里不再递归绑定,以避免无限重连)
+                } catch (error) {
+                  console.error('[WS] 重连出错:', error);
+                }
+              }, 3000);
+            } else {
+              // 没收到数据，显示重试按钮
+              statusEl.innerHTML = `
+                <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;"></span>
+                <span>连接已断开: 请手动重新连接</span>
+              `;
+              
+              compareBtn.disabled = false;
+              compareBtn.innerText = '重新连接';
+              document.body.classList.remove('loading');
+              
+              // 显示重连提示
+              const tbody = $('summaryTableBody');
+              tbody.innerHTML = `
+                <tr>
+                  <td colspan="8" style="text-align:center;padding:2rem;">
+                    <div style="color:#ef4444">连接已断开，数据处理中断</div>
+                    <div style="margin-top:0.5rem;font-size:0.9rem;">请点击"重新连接"按钮重试</div>
+                  </td>
+                </tr>
+              `;
+            }
+          } else { // 正常关闭
+            statusEl.innerHTML = `
+              <span class="status-dot" style="width:10px;height:10px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>
+              <span>连接已正常关闭</span>
+            `;
+            
+            setTimeout(() => {
+              statusEl.style.opacity = '0';
+            }, 3000);
+            
+            compareBtn.disabled = false;
+            compareBtn.innerText = '重新连接';
+            document.body.classList.remove('loading');
+            
+            // 如果没有接收到数据，提示用户
+            if (!dataReceived && activeModels.length > 0) {
+              const tbody = $('summaryTableBody');
+              tbody.innerHTML = `
+                <tr>
+                  <td colspan="8" style="text-align:center;padding:2rem;">
+                    <div style="color:#ef4444">连接已关闭，未收到数据</div>
+                    <div style="margin-top:0.5rem;font-size:0.9rem;">请点击"重新连接"按钮重试</div>
+                  </td>
+                </tr>
+              `;
+            }
+          }
+        });
+      }
+      
+      // 计算最大回撤
+      function calculateMaxDrawdown(equityCurve) {
+        if (!equityCurve || equityCurve.length < 2) return 0;
+        
+        let peak = equityCurve[0];
+        let maxDrawdown = 0;
+        
+        for (let i = 1; i < equityCurve.length; i++) {
+          const current = equityCurve[i];
+          peak = Math.max(peak, current);
+          
+          const drawdown = peak > 0 ? (peak - current) / peak : 0;
+          maxDrawdown = Math.max(maxDrawdown, drawdown);
+        }
+        
+        return maxDrawdown;
+      }
+      
+      // 从权益数据生成回撤数据
+      function generateDrawdownsFromEquity(equityCurve) {
+        if (!equityCurve || equityCurve.length < 2) return [0];
+        
+        const drawdowns = [];
+        let peak = equityCurve[0];
+        
+        for (let i = 0; i < equityCurve.length; i++) {
+          const equity = equityCurve[i];
+          
+          // 更新历史最高点
+          if (equity > peak) {
+            peak = equity;
+          }
+          
+          // 计算回撤
+          const drawdown = peak > 0 ? (peak - equity) / peak : 0;
+          drawdowns.push(drawdown);
+        }
+        
+        return drawdowns;
+      }
+      
+      // 更新图表
+      function updateCharts() {
+        console.log("开始更新图表...");
+        
+        if (!equityChart || !drawdownChart) {
+          console.log("初始化图表实例");
+          initCharts();
+        }
+        
+        // 清空现有数据
+        equityChart.data.labels = [];
+        equityChart.data.datasets = [];
+        drawdownChart.data.labels = [];
+        drawdownChart.data.datasets = [];
+        
+        // 调试信息
+        console.log("活跃模型:", activeModels);
+        
+        // 查找所有活跃模型中最长的数据序列长度
+        let maxDataPoints = 0;
+        activeModels.forEach(modelId => {
+          // 确保modelData有这个模型的条目
+          if (!modelData[modelId]) {
+            modelData[modelId] = { equity: [], trades: [], drawdowns: [], stats: {} };
+          }
+          
+          console.log('模型 ' + modelId + ' 权益数据点数量:', 
+                     (modelData[modelId].equity ? modelData[modelId].equity.length : 0));
+          console.log('模型 ' + modelId + ' 回撤数据点数量:', 
+                     (modelData[modelId].drawdowns ? modelData[modelId].drawdowns.length : 0));
+          
+          // 更新最大数据点数量
+          if (modelData[modelId].equity && modelData[modelId].equity.length > maxDataPoints) {
+            maxDataPoints = modelData[modelId].equity.length;
+          }
+        });
+        
+        // 如果没有数据点，则显示空图表
+        if (maxDataPoints === 0) {
+          console.log('没有任何模型的数据点');
+          equityChart.update();
+          drawdownChart.update();
+          return;
+        }
+        
+        // 为两个图表创建共享的标签序列
+        const sharedLabels = Array.from({ length: maxDataPoints }, (_, i) => i);
+        equityChart.data.labels = sharedLabels;
+        drawdownChart.data.labels = sharedLabels;
+        
+        // 为每个活跃模型添加数据集
+        activeModels.forEach(modelId => {
+          // 获取模型数据，如果不存在则初始化
+          if (!modelData[modelId]) {
+            modelData[modelId] = { equity: [], trades: [], drawdowns: [], stats: {} };
+          }
+          const data = modelData[modelId];
+          
+          // 如果没有权益数据，则跳过或添加一个占位符
+          if (!data.equity || data.equity.length === 0) {
+            // 如果模型有错误但没有数据，添加单个数据点以便显示在图表上
+            if (data.error) {
+              console.log('模型 ' + modelId + ' 有错误但无数据，添加占位数据点');
+              data.equity = [10000]; // 默认初始资金
+              data.drawdowns = [0];   // 零回撤
+            } else {
+              console.log('跳过模型 ' + modelId + ' - 没有权益数据');
+              return;
+            }
+          }
+          
+          // 确保回撤数据存在，如果不存在则创建或生成
+          if (!Array.isArray(data.drawdowns) || data.drawdowns.length === 0) {
+            console.log('为模型 ' + modelId + ' 生成回撤数据');
+            data.drawdowns = generateDrawdownsFromEquity(data.equity);
+          }
+          
+          // 如果回撤数据比权益数据少，补齐回撤数据
+          if (data.drawdowns.length < data.equity.length) {
+            console.log('补齐模型 ' + modelId + ' 的回撤数据');
+            const missingCount = data.equity.length - data.drawdowns.length;
+            // 使用generateDrawdownsFromEquity函数重新生成最后一部分的回撤数据
+            const additionalDrawdowns = generateDrawdownsFromEquity(data.equity.slice(-missingCount-1)).slice(1);
+            data.drawdowns.push(...additionalDrawdowns);
+          }
+          
+          console.log('模型 ' + modelId + ' 添加图表数据:', data.equity.length, "个权益点,", data.drawdowns.length, "个回撤点");
+          
+          // 获取显示名称
+          const displayName = data.model_name || modelNames[modelId] || ('模型 ' + modelId.replace('model', ''));
+          
+          // 添加权益数据
+          equityChart.data.datasets.push({
+            label: displayName + (data.error ? ' (错误)' : ''),
+            data: data.equity,
+            borderColor: MODEL_COLORS[modelId],
+            backgroundColor: hexToRgba(MODEL_COLORS[modelId], 0.1),
+            borderWidth: data.error ? 1 : 2,  // 错误的模型使用较细的线
+            tension: 0.1,
+            fill: false,
+            borderDash: data.error ? [5, 5] : []  // 错误的模型使用虚线
+          });
+          
+          // 添加回撤数据
+          drawdownChart.data.datasets.push({
+            label: displayName + (data.error ? ' (错误)' : ''),
+            data: data.drawdowns,
+            borderColor: MODEL_COLORS[modelId],
+            backgroundColor: hexToRgba(MODEL_COLORS[modelId], 0.1),
+            borderWidth: data.error ? 1 : 2,
+            tension: 0.1,
+            fill: true,
+            borderDash: data.error ? [5, 5] : []
+          });
+        });
+        
+        // 更新图表
+        equityChart.update();
+        drawdownChart.update();
+      }
+      
+      // 更新错误状态显示
+      function updateErrorStatus(modelId, errorMessage) {
+        const statusEl = document.querySelector('.connection-status');
+        if (statusEl) {
+          statusEl.style.opacity = '1';
+          statusEl.innerHTML = `
+            <span class="status-dot" style="background:#ef4444;"></span>
+            <span>模型 ${modelId.replace('model', '')} 错误: ${errorMessage}</span>
+          `;
+          
+          setTimeout(() => {
+            statusEl.style.opacity = '0';
+          }, 5000);
+        }
+      }
+      
+      // 更新摘要表
+      function updateSummaryTable() {
+        const tbody = $('summaryTableBody');
+        tbody.innerHTML = '';
+        
+        activeModels.forEach(modelId => {
+          const data = modelData[modelId];
+          
+          // 如果没有数据或统计数据不完整，跳过
+          if (!data.equity.length || !data.stats) return;
+          
+          // 获取显示名称
+          const displayName = data.model_name || modelNames[modelId] || ('模型 ' + modelId.replace('model', ''));
+          
+          // 检查是否有错误信息
+          if (data.error) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td style="color: ${MODEL_COLORS[modelId]}; font-weight: 600;">${displayName}</td>
+              <td colspan="7" style="color:#ef4444; text-align:left;">
+                <div>错误: ${data.errorMessage || data.termination_reason || "未知错误"}</div>
+                <div style="margin-top:0.5rem; font-size:0.9rem;">请检查数据文件或模型配置</div>
+              </td>
+            `;
+            tbody.appendChild(row);
+            return;
+          }
+          
+          // 统计数据
+          const stats = data.stats;
+          const row = document.createElement('tr');
+          
+          // 设置单元格内容
+          row.innerHTML = `
+            <td style="color: ${MODEL_COLORS[modelId]}; font-weight: 600;">${displayName}</td>
+            <td>${formatCurrency(stats.final_equity || 0)}</td>
+            <td class="${(stats.total_return || 0) >= 0 ? 'text-success' : 'text-danger'}">
+              ${formatPercent(stats.total_return || 0)}
+            </td>
+            <td class="text-danger">${formatPercent(stats.max_drawdown || 0)}</td>
+            <td>${formatNumber(stats.sharpe_ratio || 0)}</td>
+            <td>${formatNumber(stats.sortino_ratio || 0)}</td>
+            <td>${stats.total_trades || 0}</td>
+            <td>${formatPercent(stats.win_rate || 0)}</td>
+          `;
+          
+          tbody.appendChild(row);
+        });
+        
+        // 如果没有数据，显示提示消息
+        if (!tbody.childElementCount) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="8" style="text-align:center;padding:2rem;">
+                <div style="color:#94a3b8">暂无数据</div>
+                <div style="margin-top:0.5rem;font-size:0.9rem;">请确保选择至少一个模型并点击"比较所选模型"</div>
+              </td>
+            </tr>
+          `;
+        }
+      }
+      
+      // 处理模型数据更新
+      function processModelData(modelId, data) {
+        // 确保modelData对象有这个模型ID的条目
+        if (!modelData[modelId]) {
+          console.log('为模型创建新数据容器:', modelId);
+          modelData[modelId] = { equity: [], trades: [], drawdowns: [], stats: {} };
+        }
+        
+        console.log('处理模型 ' + modelId + ' 数据:', data);
+        
+        try {
+          // 检查是否有错误数据
+          if (data.error) {
+            console.warn('模型 ' + modelId + ' 返回错误:', data.termination_reason || "未知错误");
+            
+            // 添加错误信息到模型数据中
+            modelData[modelId].error = true;
+            modelData[modelId].errorMessage = data.termination_reason || "未知错误";
+            modelData[modelId].model_name = data.model_name || modelNames[modelId] || ('模型 ' + modelId.replace('model', ''));
+            
+            // 保存模型名称
+            if (data.model_name) {
+              modelNames[modelId] = data.model_name;
+            }
+            
+            // 如果没有数据，添加一个初始数据点以便显示
+            if (modelData[modelId].equity.length === 0) {
+              modelData[modelId].equity.push(data.margin_equity || 10000);
+              modelData[modelId].drawdowns.push(0);
+            }
+            
+            // 如果没有统计数据，创建一个
+            if (!modelData[modelId].stats || Object.keys(modelData[modelId].stats).length === 0) {
+              modelData[modelId].stats = {
+                final_equity: data.margin_equity || 10000,
+                total_return: 0,
+                max_drawdown: 0,
+                sharpe_ratio: 0,
+                sortino_ratio: 0,
+                total_trades: 0,
+                win_rate: 0,
+                errorMessage: data.termination_reason || "数据加载错误"
+              };
+            }
+            
+            // 更新错误状态
+            updateErrorStatus(modelId, data.termination_reason || "数据加载错误");
+            return;
+          }
+          
+          // 保存模型名称 
+          if (data.model_name) {
+            modelNames[modelId] = data.model_name;
+            modelData[modelId].model_name = data.model_name;
+            
+            // 更新UI
+            const btn = document.querySelector('.model-btn[data-model="' + modelId + '"]');
+            if (btn) {
+              const span = btn.querySelector('span');
+              if (span) span.textContent = data.model_name;
+            }
+          }
+          
+          // 检查数据有效性
+          // 一些服务器响应可能包含一个完整的数据点数组，而不是单个数据点
+          if (Array.isArray(data)) {
+            console.log('收到数据数组，递归处理', data.length, '个数据点');
+            data.forEach(dataPoint => processModelData(modelId, dataPoint));
+            return;
+          }
+          
+          // 更新权益数据
+          if (data.equity !== undefined) {
+            modelData[modelId].equity.push(data.equity);
+            console.log('模型 ' + modelId + ' 添加权益数据: ' + data.equity);
+          } else if (data.margin_equity !== undefined) {
+            modelData[modelId].equity.push(data.margin_equity);
+            console.log('模型 ' + modelId + ' 添加融资权益数据: ' + data.margin_equity);
+          }
+          
+          // 更新交易数据
+          if (data.trade) {
+            modelData[modelId].trades.push(data.trade);
+            console.log('模型 ' + modelId + ' 添加交易数据');
+          }
+          
+          // 更新回撤数据 (如果没有回撤数据，使用保守的默认值)
+          if (data.drawdown !== undefined) {
+            modelData[modelId].drawdowns.push(data.drawdown);
+            console.log('模型 ' + modelId + ' 添加回撤数据: ' + data.drawdown);
+          } else if (data.margin_equity !== undefined && modelData[modelId].equity.length > 1) {
+            // 基于权益变化估算回撤
+            const lastEquity = modelData[modelId].equity[modelData[modelId].equity.length - 2];
+            const currentEquity = modelData[modelId].equity[modelData[modelId].equity.length - 1];
+            const estimatedDrawdown = Math.max(0, (lastEquity - currentEquity) / lastEquity * 0.2); // 保守估计
+            modelData[modelId].drawdowns.push(estimatedDrawdown);
+            console.log('模型 ' + modelId + ' 添加估算回撤数据: ' + estimatedDrawdown);
+          }
+          
+          // 更新统计数据
+          if (data.stats) {
+            modelData[modelId].stats = data.stats;
+            console.log('模型 ' + modelId + ' 更新统计数据:', 
+              '夏普比率=' + data.stats.sharpe_ratio, 
+              '索替诺比率=' + data.stats.sortino_ratio, 
+              '交易次数=' + data.stats.total_trades, 
+              '胜率=' + data.stats.win_rate
+            );
+          }
+        } catch (err) {
+          console.error('处理模型数据时出错:', err);
+          updateErrorStatus(modelId, '数据处理错误: ' + err.message);
+        }
+      }
+      
+      // 模型选择按钮事件
+      document.querySelectorAll('.model-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const modelId = btn.dataset.model;
+          
+          // 切换选中状态
+          if (btn.classList.contains('active')) {
+            // 至少保留一个活跃模型
+            if (activeModels.length > 1) {
+              btn.classList.remove('active');
+              activeModels.splice(activeModels.indexOf(modelId), 1);
+            }
+          } else {
+            btn.classList.add('active');
+            activeModels.push(modelId);
+          }
+        });
+      });
+      
+      // 比较按钮事件
+      $('compareBtn').addEventListener('click', fetchModelData);
+      
+      // 工具函数 - HEX转RGBA
+      function hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+      
+      // 工具函数 - 格式化货币
+      function formatCurrency(value) {
+        return new Intl.NumberFormat('zh-CN', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(value);
+      }
+      
+      // 工具函数 - 格式化百分比
+      function formatPercent(value) {
+        return new Intl.NumberFormat('zh-CN', {
+          style: 'percent',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(value);
+      }
+      
+      // 工具函数 - 格式化数字
+      function formatNumber(value) {
+        return new Intl.NumberFormat('zh-CN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(value);
+      }
+      
+      try {
+        // 初始化图表
+        console.log('初始化图表...');
+        initCharts();
+        console.log('图表初始化完成');
+        
+        // 显示加载指示器
+        const modelSelectionEl = document.getElementById('modelSelection');
+        if (modelSelectionEl) {
+          const loadingIndicator = document.createElement('div');
+          loadingIndicator.className = 'loading-indicator';
+          loadingIndicator.innerHTML = '<span>正在加载模型列表...</span>';
+          modelSelectionEl.innerHTML = '';
+          modelSelectionEl.appendChild(loadingIndicator);
+        }
+        
+        // 延迟一点再请求模型列表，确保页面元素渲染完成
+        setTimeout(() => {
+          // 请求可用模型列表
+          console.log('请求可用模型列表...');
+          requestModelList((success) => {
+            if (success) {
+              // 检查是否成功加载了模型列表
+              const modelButtons = document.querySelectorAll('.model-btn');
+              console.log('找到', modelButtons.length, '个模型按钮');
+              
+              // 为新加载的按钮添加事件监听
+              if (modelButtons.length > 0) {
+                modelButtons.forEach(btn => {
+                  btn.addEventListener('click', () => {
+                    const modelId = btn.getAttribute('data-model');
+                    console.log('点击了模型按钮:', modelId);
+                    
+                    // 切换选中状态
+                    if (btn.classList.contains('active')) {
+                      // 至少保留一个活跃模型
+                      if (activeModels.length > 1) {
+                        btn.classList.remove('active');
+                        // 安全地从数组中移除
+                        const index = activeModels.indexOf(modelId);
+                        if (index > -1) {
+                          activeModels.splice(index, 1);
+                        }
+                        console.log('从活跃模型中移除', modelId, '现在活跃:', activeModels);
+                      }
+                    } else {
+                      btn.classList.add('active');
+                      // 确保不重复添加
+                      if (!activeModels.includes(modelId)) {
+                        activeModels.push(modelId);
+                      }
+                      console.log('添加到活跃模型', modelId, '现在活跃:', activeModels);
+                    }
+                  });
+                });
+                
+                // 自动请求默认模型数据
+                console.log('模型列表加载成功，3秒后自动请求模型数据...');
+                setTimeout(() => {
+                  console.log('开始自动加载模型数据，当前活跃模型:', activeModels);
+                  fetchModelData();
+                }, 3000); // 延长等待时间到3秒，确保WebSocket连接完全准备好
+              } else {
+                console.warn('未找到任何模型按钮，不自动加载模型数据');
+              }
+            } else {
+              console.error('模型列表请求失败，不自动加载模型数据');
+              
+              // 显示模型列表加载失败
+              const modelSelectionEl = document.getElementById('modelSelection');
+              if (modelSelectionEl && modelSelectionEl.querySelector('.loading-indicator')) {
+                const loadingIndicator = modelSelectionEl.querySelector('.loading-indicator');
+                loadingIndicator.innerHTML = '<span style="color:#ef4444">加载模型列表失败，请刷新页面重试</span>';
+              }
+              
+              // 启用比较按钮，允许用户手动重试
+              const compareBtn = $('compareBtn');
+              if (compareBtn) {
+                compareBtn.disabled = false;
+                compareBtn.innerText = '重新加载';
+              }
+            }
+          });
+        }, 500);
+      } catch (error) {
+        console.error('初始化过程中出错:', error);
+        alert('页面初始化失败: ' + error.message);
+      }
+    });
+  </script>
+</body>
+</html>
