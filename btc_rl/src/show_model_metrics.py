@@ -352,6 +352,17 @@ def evaluate_all_models(models_dir=None):
     
     print(f"找到 {len(model_files)} 个模型文件，开始评估...")
     
+    # 为汇总数据创建目录结构
+    metrics_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "metrics"
+    os.makedirs(metrics_dir, exist_ok=True)
+    
+    # 创建汇总数据结构
+    summary_data = {
+        "models": [],
+        "sync_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total_models": len(model_files)
+    }
+    
     # 逐个评估模型
     success_count = 0
     for model_path in sorted(model_files):
@@ -359,6 +370,23 @@ def evaluate_all_models(models_dir=None):
             print(f"\n评估模型: {model_path.name}")
             stats = evaluate_model_with_metrics(str(model_path), save_metrics=True)
             if stats:
+                # 获取模型名称（不含扩展名）
+                model_name = model_path.stem
+                
+                # 添加到汇总数据
+                model_summary = {
+                    "model_name": model_name,
+                    "model_path": str(model_path),
+                    "final_equity": stats.get("final_equity", 10000.0),
+                    "total_return": stats.get("total_return", 0.0),
+                    "max_drawdown": stats.get("max_drawdown", 0.0),
+                    "sharpe_ratio": stats.get("sharpe_ratio", 0.0),
+                    "sortino_ratio": stats.get("sortino_ratio", 0.0),
+                    "total_trades": stats.get("total_trades", 0),
+                    "win_rate": stats.get("win_rate", 0.0)
+                }
+                summary_data["models"].append(model_summary)
+                
                 print(f"模型 {model_path.name} 评估完成:")
                 print(f"- 总回报率: {format_percent(stats.get('total_return', 0))}")
                 print(f"- 交易次数: {stats.get('total_trades', 0)}")
@@ -366,6 +394,16 @@ def evaluate_all_models(models_dir=None):
                 success_count += 1
         except Exception as e:
             print(f"评估模型 {model_path.name} 时出错: {e}")
+    
+    # 保存汇总数据
+    summary_path = metrics_dir / "models_summary.json"
+    try:
+        with open(summary_path, 'w') as f:
+            json.dump(summary_data, f, indent=2)
+        print(f"已保存模型汇总数据到: {summary_path}")
+        print(f"该文件将用作WebSocket比较服务和指标分析工具的统一数据源")
+    except Exception as e:
+        print(f"保存汇总数据时出错: {e}")
     
     print(f"\n评估完成，成功评估 {success_count}/{len(model_files)} 个模型")
     return success_count > 0

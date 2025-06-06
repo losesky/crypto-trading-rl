@@ -36,6 +36,30 @@ websocket_logger.addHandler(logging.StreamHandler())
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
+# 导入指标辅助函数
+try:
+    from btc_rl.src.metrics_helpers import load_metrics_config, load_summary_metrics, get_model_metrics_from_summary
+    logger.info("成功导入指标辅助函数")
+except ImportError:
+    logger.warning("无法导入指标辅助函数，将使用本地实现")
+
+# 配置日志
+logging.basicConfig(
+    level=logging.DEBUG,  # 改为DEBUG级别以获取更详细的信息
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("model_comparison")
+
+# 设置websockets库的日志级别为DEBUG，以便查看底层连接细节
+websocket_logger = logging.getLogger('websockets')
+websocket_logger.setLevel(logging.DEBUG)
+websocket_logger.addHandler(logging.StreamHandler())
+
+# 添加父目录到路径，以便导入其他模块
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
 # 延迟导入，避免在导入阶段就发生错误
 try:
     from stable_baselines3 import SAC
@@ -754,9 +778,19 @@ def evaluate_model(model_id: str, is_preloading=True):
     
     logger.info(f"找到模型 {model_id} 路径: {model_path}, 显示名称: {model_display_name}")
     
+    # 导入model评估函数
+    try:
+        from btc_rl.src.train_sac import evaluate_model_with_metrics
+        has_evaluate_function = True
+        logger.info("成功导入evaluate_model_with_metrics函数")
+    except ImportError:
+        logger.warning("无法导入evaluate_model_with_metrics函数，将使用本地评估方法")
+        has_evaluate_function = False
+    
     # 尝试读取预计算的指标文件
     metrics_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "metrics", f"{model_display_name}_metrics.json")
     precalculated_stats = None
+    metrics_data = None
     
     if os.path.exists(metrics_file):
         try:
@@ -776,43 +810,17 @@ def evaluate_model(model_id: str, is_preloading=True):
                 }
                 logger.info(f"读取到预计算统计数据: 交易次数={precalculated_stats['total_trades']}, 胜率={precalculated_stats['win_rate']:.2%}")
                 
-                # 如果是预加载模式且已有预计算指标，可以创建简化的历史数据并提前返回
-                if is_preloading and precalculated_stats:
-                    logger.info(f"预加载模式: 使用预计算指标加快模型 {model_id} 的加载速度")
-                    # 创建一个简化的历史数据记录，只包含必要的点数
-                    simplified_history = []
-                    for i in range(0, 10):  # 只创建10个数据点用于显示
-                        equity_value = 10000 * (1 + precalculated_stats["total_return"] * i / 9)
-                        data_point = {
-                            "step": i * 100,  # 均匀分布的步骤
-                            "action": 0,
-                            "cash_balance": equity_value,
-                            "margin_equity": equity_value,
-                            "buy_and_hold_equity": 10000 * (1 + 0.5 * i / 9),
-                            "upnl": 0.0,
-                            "reward": 0.0,
-                            "price": 1000 * (1 + 0.2 * i / 9),
-                            "position_btc": 0.0,
-                            "total_fee": 0.0,
-                            "was_liquidated_this_step": False,
-                            "termination_reason": None if i < 9 else "完成",
-                            "model_id": model_id,
-                            "model_name": model_display_name,
-                            "stats": precalculated_stats  # 添加统计数据
-                        }
-                        simplified_history.append(data_point)
-                        try:
-                            msg_queue.put_nowait(data_point)
-                        except queue.Full:
-                            pass
-                    
-                    # 保存到模型历史记录
-                    MODEL_HISTORY[model_id] = simplified_history
-                    MODEL_STATS[model_id] = precalculated_stats
-                    return
+                # 保存统计数据到模型统计记录
+                MODEL_STATS[model_id] = precalculated_stats
                 
+                # 如果metrics文件中有历史数据，尝试使用它来避免重新评估
+                if "history" in metrics_data and len(metrics_data["history"]) > 0:
+                    logger.info(f"从指标文件中找到历史数据点: {len(metrics_data['history'])} 个")
+                    # 不从metrics文件中直接使用简化数据，确保进行完整评估
         except Exception as e:
             logger.warning(f"读取预计算指标文件出错: {e}, 将重新计算统计数据")
+    else:
+        logger.info(f"未找到预计算指标文件: {metrics_file}，将进行完整模型评估")
     
     # 验证模型文件是否存在
     if not os.path.exists(model_path):
@@ -842,11 +850,61 @@ def evaluate_model(model_id: str, is_preloading=True):
             logger.error("无法将错误信息添加到队列")
         return
     
-    # 创建环境
-    try:
-        env = make_env("test", msg_queue, model_id)
-        if env is None:
-            logger.error("无法创建环境，但根据要求不使用模拟数据")
+    history_data = None
+    stats = None
+    
+    # 尝试使用evaluate_model_with_metrics函数进行评估，这将确保与show_model_metrics.py使用相同的评估方法
+    if has_evaluate_function:
+        try:
+            logger.info(f"使用train_sac.evaluate_model_with_metrics评估模型: {model_path}")
+            # 调用函数但不保存指标（指标已存在）
+            result_stats = evaluate_model_with_metrics(model_path, save_metrics=False)
+            if result_stats:
+                stats = result_stats
+                logger.info(f"使用evaluate_model_with_metrics成功评估模型: {model_id}")
+                
+                # 从train_sac.py的评估函数获取历史数据 - 通常在调用过程中会发送到队列
+                # 我们依然需要进行环境评估来获取history_data
+        except Exception as e:
+            logger.error(f"使用evaluate_model_with_metrics评估模型出错: {e}")
+            logger.error(traceback.format_exc())
+            logger.warning("回退到本地评估方法")
+    
+    # 如果evaluate_model_with_metrics失败或未获取到历史数据，使用本地评估方法
+    if history_data is None:
+        # 创建环境
+        try:
+            env = make_env("test", msg_queue, model_id)
+            if env is None:
+                logger.error("无法创建环境，但根据要求不使用模拟数据")
+                # 将错误信息添加到队列和历史记录
+                error_data = {
+                    "step": 0,
+                    "action": 0,
+                    "cash_balance": 10000.0,
+                    "margin_equity": 10000.0,
+                    "buy_and_hold_equity": 10000.0,
+                    "upnl": 0.0,
+                    "reward": 0.0,
+                    "price": 0.0,
+                    "position_btc": 0.0,
+                    "total_fee": 0.0,
+                    "was_liquidated_this_step": False,
+                    "termination_reason": "无法创建环境",
+                    "model_id": model_id,
+                    "model_name": model_display_name,
+                    "error": True
+                }
+                try:
+                    msg_queue.put_nowait(error_data)
+                    MODEL_HISTORY[model_id] = [error_data]
+                except Exception:
+                    logger.error("无法将错误信息添加到队列")
+                return
+        except Exception as e:
+            logger.error(f"创建环境时发生异常: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             # 将错误信息添加到队列和历史记录
             error_data = {
                 "step": 0,
@@ -860,9 +918,8 @@ def evaluate_model(model_id: str, is_preloading=True):
                 "position_btc": 0.0,
                 "total_fee": 0.0,
                 "was_liquidated_this_step": False,
-                "termination_reason": "无法创建环境",
+                "termination_reason": f"创建环境异常: {str(e)}",
                 "model_id": model_id,
-                "model_name": model_display_name,
                 "error": True
             }
             try:
@@ -871,42 +928,47 @@ def evaluate_model(model_id: str, is_preloading=True):
             except Exception:
                 logger.error("无法将错误信息添加到队列")
             return
-    except Exception as e:
-        logger.error(f"创建环境时发生异常: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # 将错误信息添加到队列和历史记录
-        error_data = {
-            "step": 0,
-            "action": 0,
-            "cash_balance": 10000.0,
-            "margin_equity": 10000.0,
-            "buy_and_hold_equity": 10000.0,
-            "upnl": 0.0,
-            "reward": 0.0,
-            "price": 0.0,
-            "position_btc": 0.0,
-            "total_fee": 0.0,
-            "was_liquidated_this_step": False,
-            "termination_reason": f"创建环境异常: {str(e)}",
-            "model_id": model_id,
-            "error": True
-        }
-        try:
-            msg_queue.put_nowait(error_data)
-            MODEL_HISTORY[model_id] = [error_data]
-        except Exception:
-            logger.error("无法将错误信息添加到队列")
-        return
-    logger.info("交易环境创建成功")
-    
-    # 加载模型
-    try:
-        logger.info(f"尝试加载模型: {model_path}")
+        logger.info("交易环境创建成功")
         
-        # 检查文件大小，确保不是空文件
-        if os.path.getsize(model_path) == 0:
-            logger.error(f"模型文件为空: {model_path}")
+        # 加载模型
+        try:
+            logger.info(f"尝试加载模型: {model_path}")
+            
+            # 检查文件大小，确保不是空文件
+            if os.path.getsize(model_path) == 0:
+                logger.error(f"模型文件为空: {model_path}")
+                # 添加错误信息而不是使用模拟数据
+                error_data = {
+                    "step": 0,
+                    "action": 0,
+                    "cash_balance": 10000.0,
+                    "margin_equity": 10000.0,
+                    "buy_and_hold_equity": 10000.0,
+                    "upnl": 0.0,
+                    "reward": 0.0,
+                    "price": 0.0,
+                    "position_btc": 0.0,
+                    "total_fee": 0.0,
+                    "was_liquidated_this_step": False,
+                    "termination_reason": f"模型文件为空: {model_path}",
+                    "model_id": model_id,
+                    "model_name": model_display_name,
+                    "error": True
+                }
+                try:
+                    msg_queue.put_nowait(error_data)
+                    MODEL_HISTORY[model_id] = [error_data]
+                except Exception:
+                    logger.error("无法将错误信息添加到队列")
+                return
+            
+            # 尝试加载模型
+            model = SAC.load(model_path)
+            logger.info(f"模型 {model_id} 加载成功")
+        except Exception as e:
+            logger.error(f"加载模型失败: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
             # 添加错误信息而不是使用模拟数据
             error_data = {
                 "step": 0,
@@ -920,7 +982,7 @@ def evaluate_model(model_id: str, is_preloading=True):
                 "position_btc": 0.0,
                 "total_fee": 0.0,
                 "was_liquidated_this_step": False,
-                "termination_reason": f"模型文件为空: {model_path}",
+                "termination_reason": f"加载模型失败: {str(e)}",
                 "model_id": model_id,
                 "model_name": model_display_name,
                 "error": True
@@ -932,15 +994,9 @@ def evaluate_model(model_id: str, is_preloading=True):
                 logger.error("无法将错误信息添加到队列")
             return
         
-        # 尝试加载模型
-        model = SAC.load(model_path)
-        logger.info(f"模型 {model_id} 加载成功")
-    except Exception as e:
-        logger.error(f"加载模型失败: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # 添加错误信息而不是使用模拟数据
-        error_data = {
+        # 初始化历史数据列表和基础数据
+        history_data = []
+        base_data = {
             "step": 0,
             "action": 0,
             "cash_balance": 10000.0,
@@ -952,160 +1008,127 @@ def evaluate_model(model_id: str, is_preloading=True):
             "position_btc": 0.0,
             "total_fee": 0.0,
             "was_liquidated_this_step": False,
-            "termination_reason": f"加载模型失败: {str(e)}",
+            "termination_reason": None,
             "model_id": model_id,
-            "model_name": model_display_name,
-            "error": True
+            "model_name": model_display_name
         }
+        
+        # 将起始数据加入队列和历史记录
         try:
-            msg_queue.put_nowait(error_data)
-            MODEL_HISTORY[model_id] = [error_data]
-        except Exception:
-            logger.error("无法将错误信息添加到队列")
-        return
-    
-    # 初始化历史数据列表和基础数据
-    history_data = []
-    base_data = {
-        "step": 0,
-        "action": 0,
-        "cash_balance": 10000.0,
-        "margin_equity": 10000.0,
-        "buy_and_hold_equity": 10000.0,
-        "upnl": 0.0,
-        "reward": 0.0,
-        "price": 0.0,
-        "position_btc": 0.0,
-        "total_fee": 0.0,
-        "was_liquidated_this_step": False,
-        "termination_reason": None,
-        "model_id": model_id,
-        "model_name": model_display_name
-    }
-    
-    # 将起始数据加入队列和历史记录
-    try:
-        msg_queue.put_nowait(base_data)
-        history_data.append(base_data)
-    except queue.Full:
-        logger.warning(f"队列已满，无法添加基础数据")
-    
-    # 运行一个episode
-    logger.info(f"开始模型 {model_id} 的评估运行")
-    try:
-        obs, _ = env.reset()
-        done = False
-        step = 0
+            msg_queue.put_nowait(base_data)
+            history_data.append(base_data)
+        except queue.Full:
+            logger.warning(f"队列已满，无法添加基础数据")
         
-        while not done:
-            # 使用模型预测动作
-            action, _ = model.predict(obs, deterministic=True)
+        # 运行一个episode
+        logger.info(f"开始模型 {model_id} 的评估运行")
+        try:
+            obs, _ = env.reset()
+            done = False
+            step = 0
             
-            # 执行动作
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
-            step += 1
-            
-            # 数据已经通过env的websocket_queue发送
-            # 但我们也需要保存到历史记录中
-            if step % DATA_SAMPLING_INTERVAL == 0:  # 使用配置的采样间隔
-                info_copy = info.copy() if isinstance(info, dict) else {}
-                data_point = {
-                    "step": step,
-                    "action": float(action[0]) if hasattr(action, '__len__') else float(action),
-                    "cash_balance": info_copy.get("cash_balance", 10000.0),
-                    "margin_equity": info_copy.get("margin_equity", 10000.0),
-                    "buy_and_hold_equity": info_copy.get("buy_and_hold_equity", 10000.0),
-                    "upnl": info_copy.get("upnl", 0.0),
-                    "reward": float(reward) if reward is not None else 0.0,
-                    "price": info_copy.get("price", 0.0),
-                    "position_btc": info_copy.get("position_btc", 0.0),
-                    "total_fee": info_copy.get("total_fee", 0.0),
-                    "was_liquidated_this_step": bool(info_copy.get("was_liquidated_this_step", False)),
-                    "termination_reason": info_copy.get("termination_reason", None),
-                    "model_id": model_id,
-                    "model_name": model_display_name
-                }
-                history_data.append(data_point)
+            while not done:
+                # 使用模型预测动作
+                action, _ = model.predict(obs, deterministic=True)
                 
-                # 发送数据到队列，使用相同的采样间隔保持一致性
-                try:
-                    # 不立即发送数据点，等到统计数据计算完成后再一次性发送
-                    # 这样可以确保每个数据点都包含完整的统计信息
-                    pass
-                except Exception:
-                    logger.warning(f"处理数据点时出错")
-        
-            logger.info(f"模型 {model_id} 评估完成，共记录 {len(history_data)} 个数据点")            # 计算或使用预计算的模型统计指标
-            try:
-                if precalculated_stats:
-                    # 使用预计算的统计数据，但仍然通过history_data计算权益和回撤相关指标
-                    # 这样可以确保WebSocket数据的一致性，同时使用JSON文件中的交易次数和胜率
-                    calc_stats = calculate_model_statistics(history_data)
-                    
-                    # 合并计算的统计数据和预计算的统计数据
-                    stats = {
-                        "final_equity": calc_stats["final_equity"],  # 使用当前计算的权益
-                        "total_return": calc_stats["total_return"],  # 使用当前计算的回报率 
-                        "max_drawdown": calc_stats["max_drawdown"],  # 使用当前计算的最大回撤
-                        "sharpe_ratio": calc_stats["sharpe_ratio"],  # 使用当前计算的夏普比率
-                        "sortino_ratio": calc_stats["sortino_ratio"], # 使用当前计算的索提诺比率
-                        "total_trades": precalculated_stats["total_trades"],  # 使用预计算的交易次数
-                        "win_rate": precalculated_stats["win_rate"],  # 使用预计算的胜率
+                # 执行动作
+                obs, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+                step += 1
+                
+                # 数据已经通过env的websocket_queue发送
+                # 但我们也需要保存到历史记录中
+                if step % DATA_SAMPLING_INTERVAL == 0:  # 使用配置的采样间隔
+                    info_copy = info.copy() if isinstance(info, dict) else {}
+                    data_point = {
+                        "step": step,
+                        "action": float(action[0]) if hasattr(action, '__len__') else float(action),
+                        "cash_balance": info_copy.get("cash_balance", 10000.0),
+                        "margin_equity": info_copy.get("margin_equity", 10000.0),
+                        "buy_and_hold_equity": info_copy.get("buy_and_hold_equity", 10000.0),
+                        "upnl": info_copy.get("upnl", 0.0),
+                        "reward": float(reward) if reward is not None else 0.0,
+                        "price": info_copy.get("price", 0.0),
+                        "position_btc": info_copy.get("position_btc", 0.0),
+                        "total_fee": info_copy.get("total_fee", 0.0),
+                        "was_liquidated_this_step": bool(info_copy.get("was_liquidated_this_step", False)),
+                        "termination_reason": info_copy.get("termination_reason", None),
+                        "model_id": model_id,
+                        "model_name": model_display_name
                     }
-                    logger.info(f"模型 {model_id} 使用预计算统计数据: 交易次数={stats['total_trades']}, 胜率={stats['win_rate']:.2%}")
+                    history_data.append(data_point)
+            
+            # 如果使用evaluate_model_with_metrics失败，则使用本地评估的历史数据计算统计信息
+            if stats is None:
+                logger.info(f"模型 {model_id} 评估完成，共记录 {len(history_data)} 个数据点")
+                # 优先使用预计算的统计数据（特别是交易次数和胜率，这些在简化评估中可能不准确）
+                if precalculated_stats:
+                    logger.info(f"使用预计算的指标数据，确保一致性: {precalculated_stats}")
+                    # 保持股权曲线和回报率从当前评估中获取，但使用文件中的交易统计数据
+                    calc_stats = calculate_model_statistics(history_data)
+                    stats = {
+                        "final_equity": calc_stats["final_equity"],
+                        "total_return": calc_stats["total_return"],
+                        "max_drawdown": calc_stats["max_drawdown"],
+                        "sharpe_ratio": calc_stats["sharpe_ratio"],
+                        "sortino_ratio": calc_stats["sortino_ratio"],
+                        "total_trades": precalculated_stats["total_trades"],
+                        "win_rate": precalculated_stats["win_rate"],
+                    }
                 else:
-                    # 没有预计算数据，完全通过history_data计算
+                    # 完全从当前评估计算所有指标
                     stats = calculate_model_statistics(history_data)
-                    logger.info(f"模型 {model_id} 统计数据计算完成: 夏普比率={stats['sharpe_ratio']:.4f}, 索替诺比率={stats['sortino_ratio']:.4f}, 交易次数={stats['total_trades']}, 胜率={stats['win_rate']:.2%}")
-            except Exception as e:
-                logger.error(f"计算统计数据时出错: {e}")
-                # 确保有一个默认的统计数据
-                stats = {
-                    "final_equity": history_data[-1]["margin_equity"] if history_data else 10000.0,
-                    "total_return": 0.0,
-                    "max_drawdown": 0.0,
-                    "sharpe_ratio": 0.0,
-                    "sortino_ratio": 0.0,
-                    "total_trades": precalculated_stats["total_trades"] if precalculated_stats else 0,
-                    "win_rate": precalculated_stats["win_rate"] if precalculated_stats else 0.0
+        except Exception as e:
+            logger.error(f"运行模型评估时发生错误: {e}")
+            logger.error(traceback.format_exc())
+            if not history_data:
+                error_data = {
+                    "step": 0,
+                    "action": 0,
+                    "cash_balance": 10000.0,
+                    "margin_equity": 10000.0,
+                    "buy_and_hold_equity": 10000.0,
+                    "upnl": 0.0,
+                    "reward": 0.0,
+                    "price": 0.0,
+                    "position_btc": 0.0,
+                    "total_fee": 0.0,
+                    "was_liquidated_this_step": False,
+                    "termination_reason": f"评估错误: {str(e)}",
+                    "model_id": model_id,
+                    "model_name": model_display_name,
+                    "error": True
                 }
-            
-            # 将统计数据添加到每个数据点
-            for data_point in history_data:
-                data_point["stats"] = stats
-                
-            # 将带有统计数据的数据点发送到队列，确保客户端收到完整数据
-            for data_point in history_data:
                 try:
-                    msg_queue.put_nowait(data_point.copy())
-                except queue.Full:
-                    logger.warning(f"队列已满，无法添加数据点，但统计数据已添加到历史记录")
+                    msg_queue.put_nowait(error_data)
+                    MODEL_HISTORY[model_id] = [error_data]
+                except Exception:
+                    logger.error("无法将错误信息添加到队列")
+                return
+
+    # 更新MODEL_STATS，确保所有来源的统计数据一致性
+    if stats:
+        MODEL_STATS[model_id] = stats
+        logger.info(f"模型 {model_id} 统计数据: 夏普比率={stats['sharpe_ratio']:.4f}, 索替诺比率={stats['sortino_ratio']:.4f}, 交易次数={stats['total_trades']}, 胜率={stats['win_rate']:.2%}")
+    
+    # 将统计数据添加到每个历史数据点
+    if history_data:
+        for data_point in history_data:
+            data_point["stats"] = stats if stats else {}
         
-        # 存储历史数据
+        # 将历史数据保存到全局字典中
         MODEL_HISTORY[model_id] = history_data
-        return
         
-    except Exception as e:
-        logger.error(f"模型评估执行过程中出错: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        # 如果已经收集了一些数据但中途失败了，我们可以尝试使用已有数据
-        if len(history_data) > 10:
-            logger.info(f"使用已收集的 {len(history_data)} 个数据点")
-            # 即使是部分数据，也计算模型统计指标
-            stats = calculate_model_statistics(history_data)
-            logger.info(f"模型 {model_id} 部分数据统计: 夏普比率={stats['sharpe_ratio']:.4f}, 索替诺比率={stats['sortino_ratio']:.4f}, 交易次数={stats['total_trades']}, 胜率={stats['win_rate']:.2%}")
+        # 将计算结果添加到队列中，一次发送最后一个点(包含了统计指标)
+        try:
+            msg_queue.put_nowait(history_data[-1])
+            logger.info(f"已将模型 {model_id} 的最终数据点添加到队列")
+        except queue.Full:
+            logger.warning(f"队列已满，无法添加最终数据点")
             
-            # 将统计数据添加到每个数据点
-            for data_point in history_data:
-                data_point["stats"] = stats
-            
-            MODEL_HISTORY[model_id] = history_data
-            return
-        
-        # 否则添加错误信息而不是使用模拟数据
+    else:
+        logger.error(f"模型 {model_id} 评估后历史数据为空")
+        # 如果历史数据为空，添加一个错误数据点
         error_data = {
             "step": 0,
             "action": 0,
@@ -1118,55 +1141,20 @@ def evaluate_model(model_id: str, is_preloading=True):
             "position_btc": 0.0,
             "total_fee": 0.0,
             "was_liquidated_this_step": False,
-            "termination_reason": f"评估过程中出错且收集的数据不足",
+            "termination_reason": "评估后数据为空",
             "model_id": model_id,
             "model_name": model_display_name,
             "error": True,
-            "stats": {
-                "final_equity": 10000.0,
-                "total_return": 0.0,
-                "max_drawdown": 0.0,
-                "sharpe_ratio": 0.0,
-                "sortino_ratio": 0.0,
-                "total_trades": 0,
-                "win_rate": 0.0
-            }
+            "stats": stats if stats else {}
         }
         try:
             msg_queue.put_nowait(error_data)
             MODEL_HISTORY[model_id] = [error_data]
         except Exception:
             logger.error("无法将错误信息添加到队列")
-        return
-    
-    except Exception as e:
-        logger.error(f"评估模型 {model_id} 时发生未预期错误: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        
-        # 添加错误信息而不是使用模拟数据
-        error_data = {
-            "step": 0,
-            "action": 0,
-            "cash_balance": 10000.0,
-            "margin_equity": 10000.0,
-            "buy_and_hold_equity": 10000.0,
-            "upnl": 0.0,
-            "reward": 0.0,
-            "price": 0.0,
-            "position_btc": 0.0,
-            "total_fee": 0.0,
-            "was_liquidated_this_step": False,
-            "termination_reason": f"评估模型时发生未预期错误: {str(e)}",
-            "model_id": model_id,
-            "model_name": f"模型 {model_id}",  # 这里使用简单的标识，因为可能没有display_name
-            "error": True
-        }
-        try:
-            get_model_queue(model_id).put_nowait(error_data)
-            MODEL_HISTORY[model_id] = [error_data]
-        except Exception:
-            logger.error("无法将错误信息添加到队列")
+            
+    # 返回历史数据以便测试
+    return history_data
 
 def find_model_by_id(model_id: str) -> tuple:
     """根据模型ID查找对应的模型文件路径和显示名称"""

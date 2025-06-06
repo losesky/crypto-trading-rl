@@ -115,18 +115,19 @@ done
 # 显示预加载进度条
 echo -e "${YELLOW}⏳ 模型预加载进度:${NC}"
 PROGRESS=0
-while [ $PROGRESS -lt 100 ]; do
+while [ "$PROGRESS" -lt 100 ]; do
     if [ -f btc_rl/preload_progress.json ]; then
         # 使用jq解析JSON，如果jq不可用，则使用Python作为备选
         if command -v jq > /dev/null; then
             PROGRESS=$(jq -r '.percent // 0' btc_rl/preload_progress.json 2>/dev/null || echo 0)
+            PROGRESS=${PROGRESS%.*} # 去除小数部分
             FINISHED=$(jq -r '.finished // false' btc_rl/preload_progress.json 2>/dev/null || echo "false")
         else
-            PROGRESS=$(python -c "import json; data=json.load(open('btc_rl/preload_progress.json')); print(data.get('percent', 0))" 2>/dev/null || echo 0)
-            FINISHED=$(python -c "import json; data=json.load(open('btc_rl/preload_progress.json')); print(data.get('finished', False))" 2>/dev/null || echo "False")
+            PROGRESS=$(python -c "import json; data=json.load(open('btc_rl/preload_progress.json')); print(int(data.get('percent', 0)))" 2>/dev/null || echo 0)
+            FINISHED=$(python -c "import json; data=json.load(open('btc_rl/preload_progress.json')); print(str(data.get('finished', False)).lower())" 2>/dev/null || echo "false")
         fi
         
-        display_progress $PROGRESS
+        display_progress "$PROGRESS"
         
         # 如果标记为完成，跳出循环
         if [ "$FINISHED" = "true" ] || [ "$FINISHED" = "True" ]; then
