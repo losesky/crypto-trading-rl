@@ -311,7 +311,7 @@
             <th>最大回撤</th>
             <th>夏普比率</th>
             <th>索提诺比率</th>
-            <th>交易次数</th>
+            <th>总费用</th>
             <th>胜率</th>
           </tr>
         </thead>
@@ -1351,11 +1351,11 @@
                     modelData[modelId].stats = {
                       final_equity: finalValue,
                       total_return: (finalValue - initialValue) / initialValue,
-                      max_drawdown: maxDrawdown,
-                      sharpe_ratio: 0.0,  // 设置为0，表示暂未计算
-                      sortino_ratio: 0.0, // 设置为0，表示暂未计算
-                      total_trades: 0,    // 设置为0，表示暂未计算
-                      win_rate: 0.0       // 设置为0，表示暂未计算
+                      max_drawdown: maxDrawdown,                    sharpe_ratio: 0.0,  // 设置为0，表示暂未计算
+                    sortino_ratio: 0.0, // 设置为0，表示暂未计算
+                    total_trades: 0,    // 设置为0，表示暂未计算
+                    total_fees: 0.0,    // 设置为0，表示暂未计算
+                    win_rate: 0.0       // 设置为0，表示暂未计算
                     };
                   }
                   
@@ -1970,7 +1970,7 @@
             <td class="text-danger">${formatPercent(stats.max_drawdown || 0)}</td>
             <td>${formatNumber(stats.sharpe_ratio || 0)}</td>
             <td>${formatNumber(stats.sortino_ratio || 0)}</td>
-            <td>${stats.total_trades || 0}</td>
+            <td>${formatCurrency(stats.total_fees || 0)}</td>
             <td>${formatPercent(stats.win_rate || 0)}</td>
           `;
           
@@ -2030,6 +2030,7 @@
                 sharpe_ratio: 0,
                 sortino_ratio: 0,
                 total_trades: 0,
+                total_fees: 0,
                 win_rate: 0,
                 errorMessage: data.termination_reason || "数据加载错误"
               };

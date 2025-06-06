@@ -66,6 +66,7 @@ def get_model_metrics_from_summary(model_name, summary_data=None):
                 "sortino_ratio": model.get("sortino_ratio", 0.0),
                 "total_trades": model.get("total_trades", 0),
                 "win_rate": model.get("win_rate", 0.0),
+                "total_fees": model.get("total_fees", 0.0),
             }
     
     return None

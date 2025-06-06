@@ -112,7 +112,8 @@ def synchronize_metrics():
             "sharpe_ratio": metrics_data.get("sharpe_ratio", 0.0),
             "sortino_ratio": metrics_data.get("sortino_ratio", 0.0),
             "total_trades": metrics_data.get("total_trades", 0),
-            "win_rate": metrics_data.get("win_rate", 0.0)
+            "win_rate": metrics_data.get("win_rate", 0.0),
+            "total_fees": metrics_data.get("total_fees", 0.0)
         }
         summary_data["models"].append(model_summary)
     

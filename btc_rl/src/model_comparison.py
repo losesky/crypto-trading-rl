@@ -134,7 +134,8 @@ def calculate_model_statistics(history_data):
                 "sharpe_ratio": 0.0,
                 "sortino_ratio": 0.0,
                 "total_trades": 0,
-                "win_rate": 0.0
+                "win_rate": 0.0,
+                "total_fees": 0.0
             }
         
         # 提取权益曲线数据
@@ -380,8 +381,15 @@ def calculate_model_statistics(history_data):
         winning_trades = sum(1 for trade in trades if trade.get("is_win", False))
         win_rate = winning_trades / total_trades if total_trades > 0 else 0
         
+        # 计算总费用
+        total_fees = 0.0
+        for data_point in history_data:
+            fee = data_point.get("total_fee", 0.0)
+            if isinstance(fee, (int, float)):
+                total_fees += fee
+                
         # 打印更详细的信息以便调试
-        logger.info(f"交易统计详情: 总交易={total_trades}, 获胜交易={winning_trades}, 胜率={win_rate:.2%}")
+        logger.info(f"交易统计详情: 总交易={total_trades}, 获胜交易={winning_trades}, 胜率={win_rate:.2%}, 总费用={total_fees:.2f}")
         logger.info(f"交易盈亏情况: {[(i, t.get('profit', 0), t.get('is_win', False)) for i, t in enumerate(trades[:5])]}")
         
         return {
@@ -391,7 +399,8 @@ def calculate_model_statistics(history_data):
             "sharpe_ratio": float(sharpe_ratio),  # 确保可JSON序列化
             "sortino_ratio": float(sortino_ratio),  # 确保可JSON序列化
             "total_trades": total_trades,
-            "win_rate": win_rate
+            "win_rate": win_rate,
+            "total_fees": float(total_fees)  # 确保可JSON序列化
         }
         
     except Exception as e:
@@ -404,7 +413,8 @@ def calculate_model_statistics(history_data):
             "sharpe_ratio": 0.0,
             "sortino_ratio": 0.0,
             "total_trades": 0,
-            "win_rate": 0.0
+            "win_rate": 0.0,
+            "total_fees": 0.0
         }
 
 # WebSocket配置

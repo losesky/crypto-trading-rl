@@ -325,6 +325,7 @@ def main(episodes: int = 10):
             "sortino_ratio": float(stats["sortino_ratio"]),
             "total_trades": int(stats["total_trades"]),
             "win_rate": float(stats["win_rate"]),
+            "total_fees": float(stats.get("total_fees", 0.0)),
         })
         
         # 保存更新的摘要

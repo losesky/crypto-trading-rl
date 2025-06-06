@@ -15,8 +15,15 @@ from pathlib import Path
 import tabulate
 from datetime import datetime
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import sys
+
+# 设置matplotlib字体
+matplotlib.use('Agg')  # 使用非交互式后端
+# 使用基本英文字体，避免中文字体问题
+matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+matplotlib.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
 
 # 导入模型评估功能
 # 添加项目根目录到sys.path，确保能正确导入项目中的模块
@@ -96,12 +103,14 @@ def load_model_metrics(metrics_dir=None):
                 if summary_data and "models" in summary_data:
                     for model_summary in summary_data["models"]:
                         if model_summary.get("model_name") == model_name:
-                            # 更新交易次数和胜率，保持与汇总文件一致
+                            # 更新交易次数、胜率和总费用，保持与汇总文件一致
                             if "total_trades" in model_summary:
                                 data["total_trades"] = model_summary["total_trades"]
                             if "win_rate" in model_summary:
                                 data["win_rate"] = model_summary["win_rate"]
-                            print(f"已同步模型 {model_name} 的交易数据与汇总文件: 交易次数={model_summary.get('total_trades', 0)}, 胜率={model_summary.get('win_rate', 0)*100:.2f}%")
+                            if "total_fees" in model_summary:
+                                data["total_fees"] = model_summary["total_fees"]
+                            print(f"已同步模型 {model_name} 的交易数据与汇总文件: 交易次数={model_summary.get('total_trades', 0)}, 胜率={model_summary.get('win_rate', 0)*100:.2f}%, 总费用=${model_summary.get('total_fees', 0):.2f}")
                             break
                 
                 metrics_data.append(data)
@@ -120,7 +129,7 @@ def show_metrics_table(metrics_data, show_full=False, max_dd=0.05, min_sortino=2
         return
     
     # 准备表格数据
-    headers = ["模型", "最终权益", "总回报率", "最大回撤", "夏普比率", "索提诺比率", "交易次数", "胜率"]
+    headers = ["模型", "最终权益", "总回报率", "最大回撤", "夏普比率", "索提诺比率", "总费用", "胜率"]
     rows = []
     
     for data in metrics_data:
@@ -130,12 +139,12 @@ def show_metrics_table(metrics_data, show_full=False, max_dd=0.05, min_sortino=2
         max_drawdown = format_percent(data.get("max_drawdown", 0))
         sharpe_ratio = f"{data.get('sharpe_ratio', 0):.2f}"
         sortino_ratio = f"{data.get('sortino_ratio', 0):.2f}"
-        total_trades = data.get("total_trades", 0)
+        total_fees = format_currency(data.get("total_fees", 0))
         win_rate = format_percent(data.get("win_rate", 0))
         
         rows.append([
             model_name, final_equity, total_return, max_drawdown, 
-            sharpe_ratio, sortino_ratio, total_trades, win_rate
+            sharpe_ratio, sortino_ratio, total_fees, win_rate
         ])
     
     # 打印表格
@@ -240,54 +249,54 @@ def plot_metrics(metrics_data):
     drawdowns = [data.get("max_drawdown", 0) * 100 for data in metrics_data]  # 转换为百分比
     sharpes = [data.get("sharpe_ratio", 0) for data in metrics_data]
     sortinos = [data.get("sortino_ratio", 0) for data in metrics_data]
-    trades = [data.get("total_trades", 0) for data in metrics_data]
+    total_fees = [data.get("total_fees", 0) for data in metrics_data]
     win_rates = [data.get("win_rate", 0) * 100 for data in metrics_data]  # 转换为百分比
     
     # 创建2x3的子图布局
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-    fig.suptitle("模型性能指标对比", fontsize=16)
+    fig.suptitle("Model Performance Metrics", fontsize=16)
     
     # 1. 总回报率
     axes[0, 0].bar(models, returns, color='green')
-    axes[0, 0].set_title("总回报率 (%)")
-    axes[0, 0].set_ylabel("百分比")
+    axes[0, 0].set_title("Total Return (%)")
+    axes[0, 0].set_ylabel("Percentage")
     axes[0, 0].tick_params(axis='x', rotation=45)
     for i, v in enumerate(returns):
         axes[0, 0].text(i, v + 1, f"{v:.1f}%", ha='center')
     
     # 2. 最大回撤
     axes[0, 1].bar(models, drawdowns, color='red')
-    axes[0, 1].set_title("最大回撤 (%)")
-    axes[0, 1].set_ylabel("百分比")
+    axes[0, 1].set_title("Max Drawdown (%)")
+    axes[0, 1].set_ylabel("Percentage")
     axes[0, 1].tick_params(axis='x', rotation=45)
     for i, v in enumerate(drawdowns):
         axes[0, 1].text(i, v + 0.5, f"{v:.1f}%", ha='center')
     
     # 3. 夏普比率
     axes[0, 2].bar(models, sharpes, color='blue')
-    axes[0, 2].set_title("夏普比率")
+    axes[0, 2].set_title("Sharpe Ratio")
     axes[0, 2].tick_params(axis='x', rotation=45)
     for i, v in enumerate(sharpes):
         axes[0, 2].text(i, v + 0.5, f"{v:.2f}", ha='center')
     
     # 4. 索提诺比率
     axes[1, 0].bar(models, sortinos, color='purple')
-    axes[1, 0].set_title("索提诺比率")
+    axes[1, 0].set_title("Sortino Ratio")
     axes[1, 0].tick_params(axis='x', rotation=45)
     for i, v in enumerate(sortinos):
         axes[1, 0].text(i, v + 0.5, f"{v:.2f}", ha='center')
     
-    # 5. 交易次数
-    axes[1, 1].bar(models, trades, color='orange')
-    axes[1, 1].set_title("交易次数")
+    # 5. Total Fees
+    axes[1, 1].bar(models, total_fees, color='orange')
+    axes[1, 1].set_title("Total Fees")
     axes[1, 1].tick_params(axis='x', rotation=45)
-    for i, v in enumerate(trades):
-        axes[1, 1].text(i, v + 0.5, f"{v}", ha='center')
+    for i, v in enumerate(total_fees):
+        axes[1, 1].text(i, v + 0.5, f"${v:.2f}", ha='center')
     
     # 6. 胜率
     axes[1, 2].bar(models, win_rates, color='teal')
-    axes[1, 2].set_title("胜率 (%)")
-    axes[1, 2].set_ylabel("百分比")
+    axes[1, 2].set_title("Win Rate (%)")
+    axes[1, 2].set_ylabel("Percentage")
     axes[1, 2].tick_params(axis='x', rotation=45)
     for i, v in enumerate(win_rates):
         axes[1, 2].text(i, v + 2, f"{v:.1f}%", ha='center')
