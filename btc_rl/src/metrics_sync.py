@@ -27,6 +27,9 @@ project_root = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(project_root)
 sys.path.append(os.path.dirname(current_dir))  # 添加btc_rl/src目录
 
+# 导入配置工具
+from btc_rl.src.config import get_config
+
 # 导入评估函数
 try:
     from btc_rl.src.train_sac import evaluate_model_with_metrics
@@ -45,11 +48,15 @@ def synchronize_metrics():
     models = find_models()
     logger.info(f"找到 {len(models)} 个模型文件")
     
-    metrics_dir = Path(project_root) / "btc_rl" / "metrics"
+    # 从统一配置获取指标摘要文件路径
+    config = get_config()
+    metrics_summary_file = config.get_metrics_summary_file()
+    
+    metrics_dir = Path(project_root) / os.path.dirname(metrics_summary_file)
     metrics_dir.mkdir(exist_ok=True)
     
     # 创建模型摘要文件
-    summary_file = metrics_dir / "models_summary.json"
+    summary_file = Path(project_root) / metrics_summary_file
     summary_data = {
         "models": [],
         "sync_time": None,

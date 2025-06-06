@@ -28,7 +28,7 @@ ENV/
 
 # TensorBoard logs (optional, depending on your needs)
 btc_rl/logs/
-btc_rl/logs/
+btc_rl/data/
 
 # Models (optional, depending on your needs)
 btc_rl/models/

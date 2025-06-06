@@ -1,5 +1,0 @@
-{
-    "use_synchronized_metrics": true,
-    "prefer_metrics_file": true,
-    "metrics_summary_file": "btc_rl/metrics/models_summary.json"
-}

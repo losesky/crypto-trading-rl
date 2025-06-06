@@ -92,8 +92,10 @@ display_progress() {
 echo -e "${YELLOW}🔌 启动模型比较服务器并预加载模型...${NC}"
 # 删除旧的进度文件（如果存在）
 rm -f btc_rl/preload_progress.json
+# 确保日志目录存在
+mkdir -p btc_rl/logs/temp
 # 将错误输出保存到日志文件以便诊断
-python -m btc_rl.src.model_comparison --preload > ws_output.log 2>&1 &
+python -m btc_rl.src.model_comparison --preload > btc_rl/logs/temp/ws_output.log 2>&1 &
 WS_PID=$!
 
 # 打印进程信息以便调试
@@ -106,7 +108,7 @@ while [ ! -f btc_rl/preload_progress.json ]; do
     if ! ps -p $WS_PID > /dev/null; then
         echo -e "${RED}❌ 模型比较服务器启动失败${NC}"
         echo -e "${YELLOW}查看日志文件 ws_output.log 获取详细错误信息${NC}"
-        cat ws_output.log
+        cat btc_rl/logs/temp/ws_output.log
         cleanup
         exit 1
     fi
@@ -139,7 +141,7 @@ while [ "$PROGRESS" -lt 100 ]; do
     if ! ps -p $WS_PID > /dev/null; then
         echo -e "\n${RED}❌ 模型比较服务器意外终止${NC}"
         echo -e "${YELLOW}查看日志文件 ws_output.log 获取详细错误信息${NC}"
-        cat ws_output.log
+        cat btc_rl/logs/temp/ws_output.log
         cleanup
         exit 1
     fi
@@ -154,7 +156,7 @@ echo -e "\n${GREEN}✅ 模型预加载完成${NC}"
 if ! ps -p $WS_PID > /dev/null; then
     echo -e "${RED}❌ 模型比较服务器启动失败${NC}"
     echo -e "${YELLOW}查看日志文件 ws_output.log 获取详细错误信息${NC}"
-    cat ws_output.log
+    cat btc_rl/logs/temp/ws_output.log
     cleanup
     exit 1
 fi

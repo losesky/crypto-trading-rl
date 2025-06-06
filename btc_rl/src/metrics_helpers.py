@@ -5,34 +5,23 @@
 import os
 import json
 import logging
+from btc_rl.src.config import get_config
 
 logger = logging.getLogger("metrics_sync")
 
 def load_metrics_config():
     """加载指标配置，决定是否使用同步的指标数据"""
-    # 确定项目根目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(current_dir))
+    # 使用统一配置文件
+    config = get_config()
     
-    config_path = os.path.join(project_root, "btc_rl", "config", "metrics_config.json")
-    default_config = {
-        "use_synchronized_metrics": True,
-        "prefer_metrics_file": True,
-        "metrics_summary_file": "btc_rl/metrics/models_summary.json"
+    metrics_config = {
+        "use_synchronized_metrics": config.get_use_synchronized_metrics(),
+        "prefer_metrics_file": config.get_prefer_metrics_file(),
+        "metrics_summary_file": config.get_metrics_summary_file()
     }
     
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-                logger.info(f"已加载指标配置: {config}")
-                return config
-        except Exception as e:
-            logger.warning(f"无法加载指标配置文件: {e}, 使用默认配置")
-    else:
-        logger.info(f"未找到指标配置文件, 使用默认配置")
-        
-    return default_config
+    logger.info(f"已加载指标配置: {metrics_config}")
+    return metrics_config
 
 def load_summary_metrics():
     """加载汇总指标文件，获取所有模型的关键统计数据"""

@@ -25,6 +25,9 @@ project_root = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(project_root)
 sys.path.append(os.path.dirname(current_dir))  # 添加btc_rl/src目录
 
+# 导入配置工具
+from btc_rl.src.config import get_config
+
 try:
     # 使用相对导入方式，更可靠
     from btc_rl.src.train_sac import evaluate_model_with_metrics
@@ -47,18 +50,19 @@ def format_currency(value):
 def load_model_metrics(metrics_dir=None):
     """加载所有模型的指标数据"""
     if metrics_dir is None:
-        # 获取指标目录路径
+        # 从配置获取指标摘要文件路径
+        config = get_config()
+        metrics_summary_file = config.get_metrics_summary_file()
         current_dir = Path(os.path.dirname(os.path.abspath(__file__)))
         project_root = current_dir.parent.parent
-        metrics_dir = project_root / "btc_rl" / "metrics"
+        metrics_dir = project_root / os.path.dirname(metrics_summary_file)
+        summary_path = project_root / metrics_summary_file
     else:
         metrics_dir = Path(metrics_dir)
+        summary_path = metrics_dir / "models_summary.json"
     
     # 确保目录存在
     os.makedirs(metrics_dir, exist_ok=True)
-    
-    # 优先检查models_summary.json文件，它通常包含最准确的汇总指标
-    summary_path = metrics_dir / "models_summary.json"
     summary_data = {}
     if summary_path.exists():
         try:

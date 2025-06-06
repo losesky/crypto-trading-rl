@@ -22,6 +22,7 @@ from btc_rl.src.env import BtcTradingEnv
 from btc_rl.src.policies import TimeSeriesCNN
 # 导入模型评估和统计相关模块
 from btc_rl.src.model_comparison import DATA_SAMPLING_INTERVAL, calculate_model_statistics, calculate_drawdowns
+from btc_rl.src.config import get_config
 
 # --- WebSocket Server Setup ---
 WEBSOCKET_CLIENTS = set()
@@ -137,6 +138,7 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
         dict: 包含模型性能指标的字典
     """
     print(f"[评估] 正在评估模型: {model_path}")
+    config = get_config()
     
     try:
         # 检查模型文件是否存在
@@ -247,7 +249,7 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
                 "sortino_ratio": float(stats["sortino_ratio"]),
                 "total_trades": int(stats["total_trades"]),
                 "win_rate": float(stats["win_rate"]),
-                "history": history_data[-20:]  # 只保存最后20个数据点作为样本
+                "history": history_data[-config.get_history_save_count():]  # 只保存配置指定数量的数据点[-config.get_history_save_count():]  # 只保存配置指定数量的数据点
             }
             
             # 保存到文件

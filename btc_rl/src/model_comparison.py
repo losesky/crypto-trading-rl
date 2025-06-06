@@ -417,7 +417,7 @@ def get_model_queue(model_id):
     """获取模型数据队列，如果不存在则创建"""
     model_id = str(model_id)  # 确保是字符串
     if model_id not in MODEL_DATA_QUEUES:
-        MODEL_DATA_QUEUES[model_id] = queue.Queue(maxsize=1000)
+        MODEL_DATA_QUEUES[model_id] = queue.Queue(maxsize=10000)
     return MODEL_DATA_QUEUES[model_id]
 
 # 获取模型目录中的所有模型作为默认预加载列表

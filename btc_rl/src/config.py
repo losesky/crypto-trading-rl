@@ -50,6 +50,12 @@ class Config:
             'models_dir': 'btc_rl/models',
             'logs_dir': 'btc_rl/logs',
             'episodes_dir': 'btc_rl/logs/episodes'
+        },
+        'metrics': {
+            'use_synchronized_metrics': 'true',
+            'prefer_metrics_file': 'true',
+            'metrics_summary_file': 'btc_rl/metrics/models_summary.json',
+            'history_save_count': '20'
         }
     }
     
@@ -307,6 +313,38 @@ class Config:
             int: 数据采样间隔（步数）
         """
         return self.getint('visualization', 'data_sampling_interval', fallback=2)
+    
+    def get_use_synchronized_metrics(self):
+        """获取是否使用同步的指标数据
+        
+        Returns:
+            bool: 是否使用同步的指标数据
+        """
+        return self.getboolean('metrics', 'use_synchronized_metrics', fallback=True)
+    
+    def get_prefer_metrics_file(self):
+        """获取是否优先使用指标文件数据
+        
+        Returns:
+            bool: 是否优先使用指标文件数据
+        """
+        return self.getboolean('metrics', 'prefer_metrics_file', fallback=True)
+    
+    def get_metrics_summary_file(self):
+        """获取指标摘要文件路径
+        
+        Returns:
+            str: 指标摘要文件路径
+        """
+        return self.get('metrics', 'metrics_summary_file', fallback='btc_rl/metrics/models_summary.json')
+    
+    def get_history_save_count(self):
+        """获取保存到指标文件中的历史数据点数量
+        
+        Returns:
+            int: 历史数据点数量
+        """
+        return self.getint('metrics', 'history_save_count', fallback=20)
 
 
 # 创建全局配置实例
@@ -336,3 +374,7 @@ if __name__ == "__main__":
     print(f"API重试延迟时间: {cfg.get_api_retry_delay()}")
     print(f"使用指数退避: {cfg.get_api_use_exponential_backoff()}")
     print(f"数据采样间隔: {cfg.get_data_sampling_interval()}")
+    print(f"使用同步指标: {cfg.get_use_synchronized_metrics()}")
+    print(f"优先使用指标文件: {cfg.get_prefer_metrics_file()}")
+    print(f"指标摘要文件: {cfg.get_metrics_summary_file()}")
+    print(f"历史数据点数量: {cfg.get_history_save_count()}")
