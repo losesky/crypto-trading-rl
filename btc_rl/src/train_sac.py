@@ -237,6 +237,15 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
             os.makedirs(metrics_dir, exist_ok=True)
             metrics_path = os.path.join(metrics_dir, f"{model_name}_metrics.json")
             
+            # 从历史数据中提取交易记录
+            trades = extract_trades_from_history(history_data)
+            
+            # 计算权益曲线
+            equity_curve = [point.get("margin_equity", 10000.0) for point in history_data]
+            
+            # 计算回撤
+            drawdowns, max_dd = calculate_drawdowns(equity_curve)
+            
             # 准备指标数据
             metrics_data = {
                 "model_name": model_name,
@@ -249,13 +258,40 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
                 "sortino_ratio": float(stats["sortino_ratio"]),
                 "total_trades": int(stats["total_trades"]),
                 "win_rate": float(stats["win_rate"]),
-                "history": history_data[-config.get_history_save_count():]  # 只保存配置指定数量的数据点[-config.get_history_save_count():]  # 只保存配置指定数量的数据点
+                # 添加新提取的数据
+                "trades": trades,
+                "equity_curve": equity_curve,
+                "drawdowns": drawdowns,
+                "history": history_data[-config.get_history_save_count():]  # 只保存配置指定数量的数据点
             }
+            
+            # 添加额外的交易统计信息
+            if trades:
+                winning_trades = sum(1 for trade in trades if trade.get('profit', 0) > 0)
+                profit_loss_ratio = 0
+                if winning_trades > 0 and len(trades) - winning_trades > 0:
+                    win_profits = [trade.get('profit', 0) for trade in trades if trade.get('profit', 0) > 0]
+                    loss_profits = [trade.get('profit', 0) for trade in trades if trade.get('profit', 0) <= 0]
+                    avg_win = sum(win_profits) / len(win_profits) if win_profits else 0
+                    avg_loss = sum(loss_profits) / len(loss_profits) if loss_profits else 0
+                    profit_loss_ratio = abs(avg_win / avg_loss) if avg_loss != 0 else 0
+                
+                # 计算卡玛比率（总收益/最大回撤）
+                calmar_ratio = abs(stats["total_return"] / stats["max_drawdown"]) if stats["max_drawdown"] > 0 else 0
+                
+                metrics_data.update({
+                    "winning_trades": winning_trades,
+                    "losing_trades": len(trades) - winning_trades,
+                    "profit_loss_ratio": float(profit_loss_ratio),
+                    "calmar_ratio": float(calmar_ratio),
+                    # 可以添加更多交易统计指标
+                })
             
             # 保存到文件
             with open(metrics_path, 'w') as f:
                 json.dump(metrics_data, f, indent=2)
             print(f"[评估] 模型指标已保存到: {metrics_path}")
+            print(f"[评估] 自动保存了 {len(trades)} 笔交易记录，无需再运行update_model_metrics.py")
         
         return stats
     
@@ -273,7 +309,90 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
             "win_rate": 0.0
         }
 
-def main(episodes: int = 10):
+def extract_trades_from_history(history_data):
+    """
+    从历史数据中提取交易记录
+    
+    Args:
+        history_data (list): 模型历史数据点列表
+        
+    Returns:
+        list: 交易记录列表
+    """
+    if not history_data:
+        print("[提取交易] 历史数据为空，无法提取交易记录")
+        return []
+    
+    # 提取交易记录
+    position_changes = []
+    for i in range(1, len(history_data)):
+        prev_pos = history_data[i-1].get("position_btc", 0)
+        curr_pos = history_data[i].get("position_btc", 0)
+        
+        # 检测仓位变化
+        if abs(curr_pos - prev_pos) > 0.000001:
+            entry_price = history_data[i].get("price", 0)
+            entry_time = history_data[i].get("timestamp", i)  # 使用时间戳或索引
+            position_changes.append({
+                "index": i,
+                "size_change": curr_pos - prev_pos,
+                "price": entry_price,
+                "time": entry_time
+            })
+    
+    # 生成交易记录
+    trades = []
+    for i, change in enumerate(position_changes):
+        # 跳过最后一个仓位变化，因为没有对应的平仓
+        if i >= len(position_changes) - 1:
+            continue
+            
+        # 获取开仓信息
+        entry_idx = change["index"]
+        entry_price = change["price"]
+        size_change = change["size_change"]
+        side = "long" if size_change > 0 else "short"
+        
+        # 获取平仓信息
+        exit_change = position_changes[i+1]
+        exit_idx = exit_change["index"]
+        exit_price = exit_change["price"]
+        
+        # 计算持仓时间（以小时为单位，假设每个数据点间隔1小时）
+        duration = exit_idx - entry_idx
+        
+        # 计算利润
+        if side == "long":  # 做多
+            profit = (exit_price - entry_price) * abs(size_change)
+            profit_pct = (exit_price - entry_price) / entry_price
+        else:  # 做空
+            profit = (entry_price - exit_price) * abs(size_change)
+            profit_pct = (entry_price - exit_price) / entry_price
+            
+        # 创建交易记录
+        trade = {
+            "open_time": entry_idx * 3600,  # 假设每小时一个数据点
+            "close_time": exit_idx * 3600,
+            "open_price": entry_price,
+            "close_price": exit_price,
+            "side": side,
+            "size": abs(size_change),
+            "profit": profit,
+            "return_pct": profit_pct,
+            "duration": duration
+        }
+        
+        trades.append(trade)
+    
+    print(f"[提取交易] 从历史数据中提取了 {len(trades)} 笔交易记录")
+    return trades
+
+def main():
+    
+    # 从配置文件读取episodes数量
+    config = get_config()
+    episodes = config.getint('training', 'episodes', fallback=10)
+    
     # Start WebSocket server in a separate thread
     print("[Main] Starting WebSocket server thread...")
     server_thread = threading.Thread(target=start_websocket_server_thread, daemon=True)
@@ -326,14 +445,14 @@ def main(episodes: int = 10):
             "total_trades": int(stats["total_trades"]),
             "win_rate": float(stats["win_rate"]),
             "total_fees": float(stats.get("total_fees", 0.0)),
+            "calmar_ratio": float(stats.get("calmar_ratio", 0.0)),
+            "profit_loss_ratio": float(stats.get("profit_loss_ratio", 0.0)),
         })
         
         # 保存更新的摘要
         os.makedirs(os.path.dirname(summary_path), exist_ok=True)
         with open(summary_path, 'w') as f:
             json.dump(summary_data, f, indent=2)
+        print(f"[训练] 模型 {ep+1}/{episodes} 训练和评估完成，保存到: {model_path}")
         print(f"[训练] 已更新模型摘要: {summary_path}")
-
-
-if __name__ == "__main__":
-    main(episodes=10)
+    print("[训练] 所有模型训练和评估完成。")

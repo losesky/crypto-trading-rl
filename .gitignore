@@ -33,6 +33,8 @@ btc_rl/data/
 # Models (optional, depending on your needs)
 btc_rl/models/
 btc_rl/metrics/
+btc_rl/reports/
+model_backups/
 
 # Data files (you may want to include or exclude these)
 # btc_rl/data/*.npz

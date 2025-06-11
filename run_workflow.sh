@@ -30,6 +30,33 @@ cleanup() {
     exit 0
 }
 
+# 定义不会导致脚本退出的清理函数变体
+cleanup_continue() {
+    echo -e "\n🛑 正在关闭服务，但保持脚本运行..."
+    
+    # 关闭HTTP服务器
+    if [ -n "$HTTP_PID" ] && ps -p $HTTP_PID &>/dev/null; then
+        echo "关闭HTTP服务器 (PID: $HTTP_PID)..."
+        kill -9 $HTTP_PID &>/dev/null || true
+        wait $HTTP_PID 2>/dev/null || true
+        HTTP_PID=""
+    fi
+    
+    # 关闭WebSocket服务器
+    if [ -n "$WEBSOCKET_PID" ] && ps -p $WEBSOCKET_PID &>/dev/null; then
+        echo "关闭WebSocket服务器 (PID: $WEBSOCKET_PID)..."
+        kill -9 $WEBSOCKET_PID &>/dev/null || true
+        wait $WEBSOCKET_PID 2>/dev/null || true
+        WEBSOCKET_PID=""
+    fi
+    
+    # 确保没有训练相关的Python进程在后台
+    echo "正在检查是否有残留的训练进程..."
+    pkill -f "python.*btc_rl.src.run_wrapper" &>/dev/null || true
+    
+    echo "✅ 服务已关闭，继续执行脚本..."
+}
+
 # 注册信号处理函数
 trap cleanup SIGINT SIGTERM SIGHUP SIGQUIT
 
@@ -450,16 +477,58 @@ if [[ "$start_training" == "y" || "$start_training" == "Y" ]]; then
     echo -e "${YELLOW}🧠 启动模型训练与WebSocket服务...${NC}"
     echo -e "💡 按 Ctrl+C 可以随时优雅地停止训练和服务..."
     
-    # 使用与start.sh相同的方式启动训练过程
-    stdbuf -oL -eL python -m btc_rl.src.run_wrapper 2> >(grep -v "Exception\|Error\|Traceback\|Broken" >&2)
+    # 使用临时文件捕获输出，但避免复杂的管道处理
+    TEMP_OUTPUT=$(mktemp)
+    echo -e "${YELLOW}将训练输出保存在临时文件: $TEMP_OUTPUT${NC}"
     
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ 模型训练失败${NC}"
-        cleanup
-        exit 1
+    # 直接运行训练程序，将标准输出重定向到临时文件，同时保持错误输出到终端
+    python -m btc_rl.src.run_wrapper 2>&1 | tee $TEMP_OUTPUT
+    
+    # 检查训练结果
+    TRAIN_STATUS=${PIPESTATUS[0]}
+    
+    # 检查训练输出，增加对"所有模型训练和评估完成"这一消息的检测
+    if [ $TRAIN_STATUS -ne 0 ]; then
+        echo -e "${RED}❌ 模型训练失败 (退出状态: $TRAIN_STATUS)${NC}"
+        rm -f $TEMP_OUTPUT
+        if [ ! -z "$WEBSOCKET_PID" ] || [ ! -z "$HTTP_PID" ]; then
+            cleanup_continue
+        fi
+        
+        echo -e "${YELLOW}⚠️ 尽管训练退出状态码非零，我们将尝试继续执行后续步骤...${NC}"
+        echo -e "${YELLOW}⚠️ 如果后续步骤失败，请检查训练日志${NC}"
     fi
     
-    echo -e "${GREEN}✅ 模型训练完成!${NC}"
+    # 检查是否包含训练完成的消息
+    echo -e "${YELLOW}正在检查训练是否完成...${NC}"
+    TRAIN_COMPLETED=false
+    
+    if grep -q "训练已结束\|✅ 训练已结束" $TEMP_OUTPUT; then
+        echo -e "${GREEN}✅ 检测到训练已正常完成${NC}"
+        TRAIN_COMPLETED=true
+    elif grep -q "模型训练完成\|所有模型训练和评估完成" $TEMP_OUTPUT; then
+        echo -e "${GREEN}✅ 检测到训练已正常完成${NC}"
+        TRAIN_COMPLETED=true
+    else
+        echo -e "${YELLOW}⚠️ 未检测到训练完成信息，但进程已结束${NC}"
+        echo -e "${YELLOW}⚠️ 继续执行后续步骤，但请注意检查训练结果${NC}"
+    fi
+    
+    # 删除临时文件并继续
+    echo -e "${GREEN}✅ 模型训练过程已结束!${NC}"
+    rm -f $TEMP_OUTPUT
+    
+    # 强制确保脚本继续执行
+    echo -e "${GREEN}➡️ 正在准备进入下一步骤: 模型分析和评估${NC}"
+    echo -e "${YELLOW}3 秒后继续执行...${NC}"
+    
+    # 强制刷新输出缓冲区并确保进程正常继续
+    sleep 1
+    echo -e "${YELLOW}2 秒后继续执行...${NC}"
+    sleep 1
+    echo -e "${YELLOW}1 秒后继续执行...${NC}"
+    sleep 1
+    echo -e "${GREEN}继续执行！${NC}"
 else
     echo "跳过模型训练步骤"
 fi
@@ -469,16 +538,173 @@ if [ ! -z "$WEBSOCKET_PID" ] || [ ! -z "$HTTP_PID" ]; then
     echo -e "${YELLOW}可视化服务仍在运行${NC}"
     read -p "是否要关闭可视化服务? (y/n): " stop_viz
     if [[ "$stop_viz" == "y" || "$stop_viz" == "Y" ]]; then
-        echo "✅ 服务将被关闭..."
-        cleanup
+        echo "✅ 服务将被关闭但脚本继续执行..."
+        cleanup_continue
     else
-        echo -e "${YELLOW}可视化服务将继续运行，您可以访问 http://localhost:8080/index.html${NC}"
-        echo -e "${YELLOW}按 Ctrl+C 可在终端中终止服务${NC}"
-        
-        # 等待用户中断
-        trap cleanup INT
-        wait
+        echo -e "${YELLOW}可视化服务将继续运行，您可以在浏览器中访问 http://localhost:8080/index.html${NC}"
+        echo -e "${YELLOW}脚本将继续执行后续步骤，服务会保持在后台运行${NC}"
+        echo -e "${YELLOW}完成整个流程后，您可以选择是否关闭服务${NC}"
     fi
 fi
 
+# 添加检查点确认流程可以继续
+echo -e "${GREEN}➡️ 准备进入模型评估阶段...${NC}"
+sleep 1
+
+# 步骤4: 分析和评估模型性能
+echo -e "${YELLOW}步骤 4: 分析模型性能和选择最佳模型${NC}"
+read -p "是否要分析模型性能并选择最佳模型? (y/n): " analyze_models
+if [[ "$analyze_models" == "y" || "$analyze_models" == "Y" ]]; then
+    echo -e "${BLUE}🔍 正在分析模型性能指标...${NC}"
+    
+    # 检查模型文件是否存在
+    MODEL_COUNT=$(ls btc_rl/models/*.zip 2>/dev/null | wc -l)
+    if [ "$MODEL_COUNT" -eq 0 ]; then
+        echo -e "${RED}❌ 错误: 没有找到训练好的模型文件!${NC}"
+        echo -e "${YELLOW}请确保训练步骤已经完成并正确生成了模型文件${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}✓ 检测到${MODEL_COUNT}个模型文件${NC}"
+    fi
+    
+    # 临时恢复标准错误
+    exec 2>/dev/tty
+    
+    # 设置分析选项
+    ANALYZE_OPTIONS="--evaluate --full"
+    
+    # 根据用户配置提取回撤阈值
+    MAX_DD_VALUE=$(get_config_value "model_selection" "maximum_drawdown" "0.35")
+    # 转换为百分比格式
+    MAX_DD_VALUE=$(echo "$MAX_DD_VALUE" | awk '{print $1+0}')
+    
+    # 获取最低夏普比率和索提诺比率
+    MIN_SHARPE_VALUE=$(get_config_value "model_selection" "minimum_sharpe" "5.0")
+    MIN_SORTINO_VALUE=$(echo "$MIN_SHARPE_VALUE * 4" | bc) # 通常索提诺比率选择夏普比率的4倍作为基准
+    
+    # 运行分析脚本
+    echo -e "${BLUE}📊 运行模型分析...${NC}"
+    ./analyze_metrics.sh $ANALYZE_OPTIONS --max-dd $MAX_DD_VALUE --min-sharpe $MIN_SHARPE_VALUE --min-sortino $MIN_SORTINO_VALUE
+    
+    echo -e "\n${BLUE}🏆 选择最佳模型（黄金法则评分）...${NC}"
+    python select_best_model.py
+    
+    # 存储最佳模型信息
+    BEST_MODEL_INFO=$(python -c "
+import json
+from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+model_info = get_best_model_by_golden_rule()
+if model_info:
+    print(model_info['model_name'])
+    print(model_info['model_path'])
+")
+    
+    BEST_MODEL_NAME=$(echo "$BEST_MODEL_INFO" | head -1)
+    BEST_MODEL_PATH=$(echo "$BEST_MODEL_INFO" | tail -1)
+    
+    if [ -n "$BEST_MODEL_NAME" ] && [ -n "$BEST_MODEL_PATH" ] && [ -f "$BEST_MODEL_PATH" ]; then
+        echo -e "${GREEN}✅ 最佳模型: $BEST_MODEL_NAME${NC}"
+        echo -e "${GREEN}✅ 模型路径: $BEST_MODEL_PATH${NC}"
+        
+        # 询问是否要备份最佳模型
+        read -p "是否要备份最佳模型? (y/n): " backup_model
+        if [[ "$backup_model" == "y" || "$backup_model" == "Y" ]]; then
+            BACKUP_DIR="$WORKSPACE/btc_rl/models/best_model"
+            BACKUP_DATE=$(date +"%Y%m%d_%H%M%S")
+            BACKUP_PATH="$BACKUP_DIR/${BEST_MODEL_NAME}_${BACKUP_DATE}.zip"
+            
+            # 确保备份目录存在
+            mkdir -p "$BACKUP_DIR"
+            
+            # 复制模型文件
+            cp "$BEST_MODEL_PATH" "$BACKUP_PATH"
+            echo -e "${GREEN}✅ 最佳模型已备份至: $BACKUP_PATH${NC}"
+        fi
+        
+        # 询问是否要回测最佳模型
+        read -p "是否要回测最佳模型性能? (y/n): " backtest_model
+        if [[ "$backtest_model" == "y" || "$backtest_model" == "Y" ]]; then
+            echo -e "${YELLOW}🧪 开始回测最佳模型...${NC}"
+            ./backtest_best_model.sh --model "$BEST_MODEL_NAME" --full --report
+            echo -e "${GREEN}✅ 回测完成!${NC}"
+        fi
+    else
+        echo -e "${RED}❌ 未能识别最佳模型${NC}"
+    fi
+else
+    echo "跳过模型分析步骤"
+fi
+
+# 步骤5: 清理环境和进程
+echo -e "${YELLOW}步骤 5: 清理环境${NC}"
+read -p "是否要关闭所有服务并清理环境? (y/n): " cleanup_env
+if [[ "$cleanup_env" == "y" || "$cleanup_env" == "Y" ]]; then
+    echo -e "${YELLOW}🧹 清理环境并关闭所有进程...${NC}"
+    # 这里使用cleanup函数，因为这是脚本最后阶段，可以安全退出
+    cleanup
+    exit 0  # 确保脚本在此处终止
+else
+    echo -e "${YELLOW}⚠️ 环境未完全清理，部分进程可能仍在运行${NC}"
+    echo -e "${YELLOW}如需手动清理，请运行以下命令:${NC}"
+    echo "pkill -f \"python.*btc_rl.src\""
+    echo "fuser -k -9 8080/tcp 8765/tcp"
+fi
+
 echo -e "${GREEN}✅ 工作流程执行完毕!${NC}"
+echo -e "${BLUE}=================================================================${NC}"
+echo -e "${GREEN}BTC交易强化学习系统工作流程总结:${NC}"
+echo -e "${BLUE}=================================================================${NC}"
+
+# 打印流程总结
+if [ -n "$BEST_MODEL_NAME" ] && [ -n "$BEST_MODEL_PATH" ] && [ -f "$BEST_MODEL_PATH" ]; then
+    echo -e "📊 ${YELLOW}最佳交易模型:${NC} $BEST_MODEL_NAME"
+    echo -e "📂 ${YELLOW}模型文件位置:${NC} $BEST_MODEL_PATH"
+    
+    # 调用Python脚本获取模型关键指标
+    MODEL_METRICS=$(python -c "
+import json
+from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+model_info = get_best_model_by_golden_rule()
+if model_info:
+    metrics = {
+        'score': model_info.get('golden_rule_score', 0),
+        'return': model_info.get('total_return', 0),
+        'drawdown': model_info.get('max_drawdown', 0),
+        'sharpe': model_info.get('sharpe_ratio', 0),
+        'winrate': model_info.get('win_rate', 0),
+        'equity': model_info.get('final_equity', 0)
+    }
+    print(json.dumps(metrics))
+")
+    
+    if [ -n "$MODEL_METRICS" ]; then
+        # 解析模型指标
+        MODEL_SCORE=$(echo "$MODEL_METRICS" | python -c "import json,sys; print(json.load(sys.stdin).get('score', 0))")
+        MODEL_RETURN=$(echo "$MODEL_METRICS" | python -c "import json,sys; print(json.load(sys.stdin).get('return', 0))")
+        MODEL_DRAWDOWN=$(echo "$MODEL_METRICS" | python -c "import json,sys; print(json.load(sys.stdin).get('drawdown', 0))")
+        MODEL_SHARPE=$(echo "$MODEL_METRICS" | python -c "import json,sys; print(json.load(sys.stdin).get('sharpe', 0))")
+        MODEL_WINRATE=$(echo "$MODEL_METRICS" | python -c "import json,sys; print(json.load(sys.stdin).get('winrate', 0))")
+        MODEL_EQUITY=$(echo "$MODEL_METRICS" | python -c "import json,sys; print(json.load(sys.stdin).get('equity', 0))")
+        
+        # 格式化百分比和货币值
+        MODEL_RETURN_PCT=$(printf "%.2f%%" $(echo "$MODEL_RETURN * 100" | bc))
+        MODEL_DRAWDOWN_PCT=$(printf "%.2f%%" $(echo "$MODEL_DRAWDOWN * 100" | bc))
+        MODEL_WINRATE_PCT=$(printf "%.2f%%" $(echo "$MODEL_WINRATE * 100" | bc))
+        MODEL_EQUITY_FMT=$(printf "$%.2f" $MODEL_EQUITY)
+        
+        echo -e "📈 ${YELLOW}综合评分:${NC} ${GREEN}${MODEL_SCORE}${NC}"
+        echo -e "💰 ${YELLOW}最终权益:${NC} ${GREEN}${MODEL_EQUITY_FMT}${NC}"
+        echo -e "📈 ${YELLOW}总回报率:${NC} ${GREEN}${MODEL_RETURN_PCT}${NC}"
+        echo -e "📉 ${YELLOW}最大回撤:${NC} ${RED}${MODEL_DRAWDOWN_PCT}${NC}"
+        echo -e "📊 ${YELLOW}夏普比率:${NC} ${GREEN}${MODEL_SHARPE}${NC}"
+        echo -e "🎯 ${YELLOW}胜率:${NC} ${GREEN}${MODEL_WINRATE_PCT}${NC}"
+    else
+        echo -e "${RED}⚠️ 未能加载模型详细指标${NC}"
+    fi
+else
+    echo -e "${RED}⚠️ 未能确定最佳模型${NC}"
+fi
+
+echo -e "${BLUE}=================================================================${NC}"
+echo -e "${GREEN}感谢使用BTC交易强化学习系统!${NC}"
+echo -e "${BLUE}=================================================================${NC}"

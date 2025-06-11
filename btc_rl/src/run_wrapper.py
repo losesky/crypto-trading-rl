@@ -95,16 +95,24 @@ def silence_exceptions():
     sys.excepthook = excepthook
 
 if __name__ == "__main__":
-    # 设置自动刷新输出，使训练进度能够实时显示
-    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
-    
-    # 注册信号处理器
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # 避免破管异常
-    
-    # 替换异常处理器
-    silence_exceptions()
-    print("🚀 启动训练进程...")
-    run_training()
-    print("\n✅ 训练已结束")
+    try:
+        # 设置自动刷新输出，使训练进度能够实时显示
+        sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
+        
+        # 注册信号处理器
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # 避免破管异常
+        
+        # 替换异常处理器
+        silence_exceptions()
+        print("🚀 启动训练进程...")
+        run_training()
+        print("\n✅ 训练已结束")
+        # 确保消息被立即输出，不被缓冲
+        sys.stdout.flush()
+    finally:
+        # 确保脚本正常退出
+        print("训练进程退出")
+        # 使用os._exit确保进程立即退出，不等待其他线程
+        os._exit(0)

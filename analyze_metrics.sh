@@ -89,7 +89,6 @@ if [ $HELP -eq 1 ]; then
     echo
     echo "示例:"
     echo "  $0 --evaluate --full      # 重新评估所有模型并显示完整信息"
-    echo "  $0 --fix-winrate          # 修复所有模型的胜率数据"
     echo "  $0 --plot                 # 显示图表比较"
     echo "  $0 --max-dd 0.03 --min-sortino 20 --min-sharpe 10  # 自定义风控阈值"
     echo "==================================================="

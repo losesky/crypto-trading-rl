@@ -417,6 +417,684 @@ def calculate_model_statistics(history_data):
             "total_fees": 0.0
         }
 
+# 黄金法则模型评估函数
+def calculate_advanced_drawdown_metrics(equity_curve):
+    """
+    计算高级回撤指标，包括最大回撤持续时间
+    
+    Args:
+        equity_curve (list): 权益曲线数据
+        
+    Returns:
+        dict: 包含回撤相关指标的字典
+    """
+    if not equity_curve or len(equity_curve) <= 1:
+        return {
+            "max_drawdown": 0.0,
+            "max_drawdown_duration": 0,
+            "avg_recovery_time": 0,
+            "drawdown_periods": []
+        }
+    
+    # 计算历史新高和回撤
+    peak = equity_curve[0]
+    drawdown_start = None
+    max_drawdown = 0.0
+    max_drawdown_start = None
+    max_drawdown_end = None
+    drawdown_periods = []
+    in_drawdown = False
+    
+    for i, equity in enumerate(equity_curve):
+        # 更新峰值
+        if equity > peak:
+            peak = equity
+            
+            # 如果在回撤中并已恢复，记录这段回撤期
+            if in_drawdown:
+                in_drawdown = False
+                if drawdown_start is not None:
+                    duration = i - drawdown_start
+                    drawdown_periods.append({
+                        "start_idx": drawdown_start,
+                        "end_idx": i,
+                        "duration": duration,
+                        "depth": (peak_value - min_value) / peak_value
+                    })
+                drawdown_start = None
+        
+        # 计算当前回撤
+        if peak != 0:
+            current_drawdown = (peak - equity) / peak
+            
+            # 更新最大回撤
+            if current_drawdown > max_drawdown:
+                max_drawdown = current_drawdown
+                max_drawdown_start = drawdown_start if drawdown_start is not None else i
+                max_drawdown_end = i
+                
+            # 检测是否进入回撤
+            if current_drawdown > 0.01 and not in_drawdown:  # 1%以上视为显著回撤
+                in_drawdown = True
+                drawdown_start = i
+                peak_value = peak
+                min_value = equity
+            
+            # 更新回撤中的最低点
+            if in_drawdown and equity < min_value:
+                min_value = equity
+    
+    # 计算最大回撤持续时间
+    max_drawdown_duration = max_drawdown_end - max_drawdown_start if max_drawdown_start is not None and max_drawdown_end is not None else 0
+    
+    # 计算平均恢复时间
+    recovery_times = [p["duration"] for p in drawdown_periods if p["depth"] > 0.01]  # 忽略微小回撤
+    avg_recovery_time = sum(recovery_times) / len(recovery_times) if recovery_times else 0
+    
+    return {
+        "max_drawdown": max_drawdown,
+        "max_drawdown_duration": max_drawdown_duration,
+        "avg_recovery_time": avg_recovery_time,
+        "drawdown_periods": drawdown_periods
+    }
+
+def calculate_profit_loss_ratio_and_capacity(history_data):
+    """
+    计算盈亏比和策略容量相关指标
+    
+    Args:
+        history_data (list): 模型历史数据
+        
+    Returns:
+        dict: 包含交易质量和策略容量指标的字典
+    """
+    if not history_data:
+        return {
+            "profit_loss_ratio": 0.0,
+            "avg_trade_return": 0.0,
+            "strategy_capacity": 0.0,
+            "scalability_score": 0.0
+        }
+    
+    # 检测交易
+    position_changes = []
+    prev_pos = history_data[0].get("position_btc", 0)
+    
+    for i in range(1, len(history_data)):
+        curr_pos = history_data[i].get("position_btc", 0)
+        if abs(curr_pos - prev_pos) > 0.000001:  # 检测仓位变化
+            entry_price = history_data[i].get("price", 0)
+            position_changes.append({
+                "index": i, 
+                "size_change": curr_pos - prev_pos, 
+                "price": entry_price,
+                "equity": history_data[i].get("margin_equity", 10000.0)
+            })
+        prev_pos = curr_pos
+    
+    # 如果没有足够的交易，返回默认值
+    if len(position_changes) < 2:
+        return {
+            "profit_loss_ratio": 0.0,
+            "avg_trade_return": 0.0,
+            "strategy_capacity": 0.0,
+            "scalability_score": 0.0
+        }
+    
+    # 计算交易盈亏
+    total_profit = 0.0
+    total_loss = 0.0
+    winning_trades = 0
+    losing_trades = 0
+    trade_returns = []
+    
+    # 计算每笔交易的收益
+    for i in range(len(position_changes) - 1):
+        entry = position_changes[i]
+        exit = position_changes[i+1]
+        
+        # 计算交易收益
+        if entry["size_change"] > 0:  # 做多
+            profit = (exit["price"] - entry["price"]) * abs(entry["size_change"])
+        else:  # 做空
+            profit = (entry["price"] - exit["price"]) * abs(entry["size_change"])
+        
+        # 记录盈利或亏损
+        if profit > 0:
+            total_profit += profit
+            winning_trades += 1
+        else:
+            total_loss += abs(profit)
+            losing_trades += 1
+        
+        # 计算相对于权益的收益率
+        trade_return = profit / entry["equity"] if entry["equity"] > 0 else 0
+        trade_returns.append(trade_return)
+    
+    # 计算盈亏比
+    profit_loss_ratio = total_profit / total_loss if total_loss > 0 and winning_trades > 0 else 0.0
+    
+    # 计算平均每笔交易收益率
+    avg_trade_return = sum(trade_returns) / len(trade_returns) if trade_returns else 0.0
+    
+    # 计算策略容量相关指标
+    # 1. 交易规模扩大时的表现稳定性
+    large_trades = [tr for i, tr in enumerate(trade_returns) if abs(position_changes[i]["size_change"]) > 
+                   np.mean([abs(pc["size_change"]) for pc in position_changes])]
+    
+    small_trades = [tr for i, tr in enumerate(trade_returns) if abs(position_changes[i]["size_change"]) <= 
+                   np.mean([abs(pc["size_change"]) for pc in position_changes])]
+    
+    # 计算大小交易的收益率差异
+    large_return = np.mean(large_trades) if large_trades else 0
+    small_return = np.mean(small_trades) if small_trades else 0
+    
+    # 策略容量评分：如果大交易表现与小交易接近或更好，则容量更大
+    scalability_score = large_return / small_return if small_return > 0 else 0
+    
+    # 总体策略容量评分 (结合交易规模和稳定性)
+    strategy_capacity = scalability_score * avg_trade_return * profit_loss_ratio if avg_trade_return > 0 else 0
+    
+    return {
+        "profit_loss_ratio": profit_loss_ratio,
+        "avg_trade_return": avg_trade_return,
+        "strategy_capacity": strategy_capacity,
+        "scalability_score": scalability_score
+    }
+
+def calculate_return_consistency(returns):
+    """
+    计算收益的一致性，基于收益率的波动
+    
+    Args:
+        returns (list): 每个时间段的收益率列表
+        
+    Returns:
+        float: 一致性得分，越高表示越稳定
+    """
+    if not returns or len(returns) < 2:
+        return 0.0
+    
+    # 使用变异系数的倒数作为一致性指标
+    mean = np.mean(returns)
+    std = np.std(returns)
+    
+    # 防止除以零，同时确保指标方向正确(越高越好)
+    if mean == 0 or std == 0:
+        return 0.0
+    
+    # 使用变异系数的倒数，并进行归一化处理
+    cv = std / abs(mean)  # 变异系数
+    consistency = 1.0 / (1.0 + cv)  # 转换为0-1之间的分数，越高越稳定
+    
+    return consistency
+
+def calculate_calmar_ratio(total_return, max_drawdown, days=252):
+    """
+    计算卡玛比率 (年化收益率/最大回撤)
+    
+    Args:
+        total_return (float): 总回报率
+        max_drawdown (float): 最大回撤比例
+        days (int): 年化天数
+        
+    Returns:
+        float: 卡玛比率
+    """
+    if max_drawdown <= 0:
+        return 0.0
+    
+    # 假设数据点代表每日回报，进行年化
+    annualized_return = (1 + total_return) ** (days / 252) - 1
+    calmar = annualized_return / max_drawdown if max_drawdown > 0 else 0.0
+    
+    return calmar
+
+def rank_models_by_golden_rule(models_data, config):
+    """
+    根据黄金法则对模型进行全面评估和排名
+    单一指标权重≤20%，结合回撤持续时间、盈亏比、策略容量三维验证
+    
+    Args:
+        models_data (list): 模型数据列表，每个元素是一个包含模型评估指标的字典
+        config (Config): 配置对象，包含评分权重和筛选条件
+        
+    Returns:
+        list: 按照综合评分排序后的模型列表
+    """
+    # 从配置获取权重
+    # 基本风险回报指标 (40%)
+    w_return = config.getfloat('model_selection', 'return_weight', fallback=0.08)
+    w_consistency = config.getfloat('model_selection', 'consistency_weight', fallback=0.08)
+    w_sharpe = config.getfloat('model_selection', 'sharpe_weight', fallback=0.08)
+    w_sortino = config.getfloat('model_selection', 'sortino_weight', fallback=0.08)
+    w_calmar = config.getfloat('model_selection', 'calmar_weight', fallback=0.08)
+    
+    # 回撤维度 (20%)
+    w_max_drawdown = config.getfloat('model_selection', 'max_drawdown_weight', fallback=0.10)
+    w_drawdown_duration = config.getfloat('model_selection', 'drawdown_duration_weight', fallback=0.10)
+    
+    # 交易质量维度 (20%)
+    w_win_rate = config.getfloat('model_selection', 'win_rate_weight', fallback=0.05)
+    w_profit_loss = config.getfloat('model_selection', 'profit_loss_ratio_weight', fallback=0.10)
+    w_avg_trade = config.getfloat('model_selection', 'avg_trade_return_weight', fallback=0.05)
+    
+    # 策略容量维度 (20%)
+    w_capacity = config.getfloat('model_selection', 'capacity_weight', fallback=0.10)
+    w_cost = config.getfloat('model_selection', 'cost_efficiency_weight', fallback=0.10)
+    
+    # 获取筛选条件，添加默认值降低标准
+    min_return = config.getfloat('model_selection', 'minimum_return', fallback=0.5)
+    max_drawdown = config.getfloat('model_selection', 'maximum_drawdown', fallback=0.4)
+    min_sharpe = config.getfloat('model_selection', 'minimum_sharpe', fallback=4.0)
+    min_win_rate = config.getfloat('model_selection', 'minimum_win_rate', fallback=0.3)
+    min_profit_loss = config.getfloat('model_selection', 'minimum_profit_loss_ratio', fallback=1.0)
+    
+    logger.info(f"模型筛选条件: 最低回报率={min_return*100:.0f}%, 最大回撤={max_drawdown*100:.0f}%, " + 
+                f"最低夏普比率={min_sharpe:.1f}, 最低胜率={min_win_rate*100:.0f}%")
+    
+    # 第一轮筛选：严格应用基本条件
+    qualified_models = []
+    skipped_models = []
+    for model in models_data:
+        if not model:
+            continue
+            
+        # 单独检查每个条件，便于调试
+        meets_return = model.get('total_return', 0) >= min_return
+        meets_drawdown = model.get('max_drawdown', 1.0) <= max_drawdown
+        meets_sharpe = model.get('sharpe_ratio', 0) >= min_sharpe
+        meets_win_rate = model.get('win_rate', 0) >= min_win_rate
+        
+        meets_basic_criteria = meets_return and meets_drawdown and meets_sharpe
+        
+        # 记录不满足条件的模型
+        if not meets_basic_criteria or not meets_win_rate:
+            reason = []
+            if not meets_return:
+                reason.append(f"回报率低({model.get('total_return', 0)*100:.2f}%<{min_return*100:.0f}%)")
+            if not meets_drawdown:
+                reason.append(f"回撤高({model.get('max_drawdown', 1.0)*100:.2f}%>{max_drawdown*100:.0f}%)")
+            if not meets_sharpe:
+                reason.append(f"夏普比率低({model.get('sharpe_ratio', 0):.2f}<{min_sharpe:.1f})")
+            if not meets_win_rate:
+                reason.append(f"胜率低({model.get('win_rate', 0)*100:.2f}%<{min_win_rate*100:.0f}%)")
+                
+            logger.warning(f"模型 {model.get('model_name', '未知')} 被过滤 [原因: {', '.join(reason)}]")
+            skipped_models.append(model.get('model_name', '未知'))
+            continue
+        
+        # 只有满足所有条件的模型才会被纳入评估
+        model_copy = model.copy()
+        qualified_models.append(model_copy)
+    
+    if skipped_models:
+        logger.warning(f"注意: 以下模型因不满足条件而被排除: {', '.join(skipped_models)}")
+        
+    if not qualified_models:
+        logger.warning("警告: 没有模型满足条件！尝试放宽胜率要求...")
+        # 如果没有模型满足条件，先尝试放宽胜率要求
+        if min_win_rate > 0.2:
+            relaxed_min_win_rate = max(0.2, min_win_rate - 0.1)  # 放宽10%
+            logger.info(f"放宽胜率要求至 {relaxed_min_win_rate*100:.1f}% (原要求: {min_win_rate*100:.1f}%)")
+            
+            for model in models_data:
+                if not model:
+                    continue
+                    
+                meets_return = model.get('total_return', 0) >= min_return
+                meets_drawdown = model.get('max_drawdown', 1.0) <= max_drawdown
+                meets_sharpe = model.get('sharpe_ratio', 0) >= min_sharpe
+                meets_relaxed_win_rate = model.get('win_rate', 0) >= relaxed_min_win_rate
+                
+                if meets_return and meets_drawdown and meets_sharpe and meets_relaxed_win_rate:
+                    logger.info(f"按放宽后的标准添加模型: {model.get('model_name', '未知')} (胜率: {model.get('win_rate', 0)*100:.2f}%)")
+                    model_copy = model.copy()
+                    qualified_models.append(model_copy)
+        
+        # 如果仍然没有符合条件的模型，使用所有模型
+        if not qualified_models:
+            logger.warning("即使放宽标准后也没有模型满足条件！将使用所有模型进行评估，但请注意结果可能不符合预期。")
+            qualified_models = [model.copy() for model in models_data if model]
+    
+    # 为每个合格模型计算高级指标
+    for model in qualified_models:
+        # 获取模型的历史数据
+        model_name = model.get('model_name', '')
+        try:
+            metrics_file = f"btc_rl/metrics/{model_name}_metrics.json"
+            with open(metrics_file, 'r') as f:
+                metrics_data = json.load(f)
+                history_data = metrics_data.get('history', [])
+                
+                if history_data:
+                    # 提取权益曲线
+                    equity_curve = [point.get('margin_equity', 10000.0) for point in history_data]
+                    
+                    # 计算收益率数据
+                    returns = []
+                    for i in range(1, len(equity_curve)):
+                        ret = (equity_curve[i] - equity_curve[i-1]) / equity_curve[i-1] if equity_curve[i-1] > 0 else 0
+                        returns.append(ret)
+                    
+                    # 1. 计算回报一致性
+                    model['consistency_score'] = calculate_return_consistency(returns)
+                    
+                    # 2. 计算高级回撤指标
+                    drawdown_metrics = calculate_advanced_drawdown_metrics(equity_curve)
+                    model['max_drawdown_duration'] = drawdown_metrics['max_drawdown_duration']
+                    model['avg_recovery_time'] = drawdown_metrics['avg_recovery_time']
+                    
+                    # 3. 计算卡玛比率
+                    model['calmar_ratio'] = calculate_calmar_ratio(model.get('total_return', 0), model.get('max_drawdown', 0))
+                    
+                    # 4. 计算交易质量和策略容量指标
+                    trade_metrics = calculate_profit_loss_ratio_and_capacity(history_data)
+                    model['profit_loss_ratio'] = trade_metrics['profit_loss_ratio']
+                    model['avg_trade_return'] = trade_metrics['avg_trade_return']
+                    model['strategy_capacity'] = trade_metrics['strategy_capacity']
+                    
+                    # 5. 计算成本效率
+                    if model.get('total_return', 0) > 0:
+                        model['cost_efficiency'] = model.get('total_fees', 0) / (model.get('total_return', 0) * 10000)
+                    else:
+                        model['cost_efficiency'] = float('inf')  # 无限大表示效率极低
+                else:
+                    logger.warning(f"模型 {model_name} 没有历史数据，无法计算高级指标")
+        except Exception as e:
+            logger.error(f"为模型 {model_name} 计算高级指标时出错: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+    
+    # 标准化所有指标用于评分
+    metrics_to_normalize = [
+        # 正向指标 (越高越好)
+        'total_return', 'consistency_score', 'sharpe_ratio', 'sortino_ratio', 
+        'calmar_ratio', 'win_rate', 'profit_loss_ratio', 'avg_trade_return', 'strategy_capacity',
+        # 负向指标 (越低越好)
+        'max_drawdown', 'max_drawdown_duration', 'cost_efficiency' 
+    ]
+    
+    # 初始化每个指标的最小值和最大值
+    min_values = {metric: float('inf') for metric in metrics_to_normalize}
+    max_values = {metric: float('-inf') for metric in metrics_to_normalize}
+    
+    # 找出每个指标的最小值和最大值
+    for model in qualified_models:
+        for metric in metrics_to_normalize:
+            value = model.get(metric, 0)
+            min_values[metric] = min(min_values[metric], value)
+            max_values[metric] = max(max_values[metric], value)
+    
+    # 标准化每个模型的指标
+    for model in qualified_models:
+        for metric in metrics_to_normalize:
+            value = model.get(metric, 0)
+            range_val = max_values[metric] - min_values[metric]
+            
+            if range_val > 0:
+                if metric in ['max_drawdown', 'max_drawdown_duration', 'cost_efficiency']:
+                    # 负向指标，值越低越好
+                    model[f'norm_{metric}'] = 1.0 - (value - min_values[metric]) / range_val
+                else:
+                    # 正向指标，值越高越好
+                    model[f'norm_{metric}'] = (value - min_values[metric]) / range_val
+            else:
+                model[f'norm_{metric}'] = 0.5  # 所有模型在这个指标上相同
+    
+    # 计算综合评分
+    for model in qualified_models:
+        score = (
+            # 基本风险回报指标 (40%)
+            w_return * model.get('norm_total_return', 0) +
+            w_consistency * model.get('norm_consistency_score', 0) +
+            w_sharpe * model.get('norm_sharpe_ratio', 0) +
+            w_sortino * model.get('norm_sortino_ratio', 0) +
+            w_calmar * model.get('norm_calmar_ratio', 0) +
+            
+            # 回撤维度 (20%)
+            w_max_drawdown * model.get('norm_max_drawdown', 0) +
+            w_drawdown_duration * model.get('norm_max_drawdown_duration', 0) +
+            
+            # 交易质量维度 (20%)
+            w_win_rate * model.get('norm_win_rate', 0) +
+            w_profit_loss * model.get('norm_profit_loss_ratio', 0) +
+            w_avg_trade * model.get('norm_avg_trade_return', 0) +
+            
+            # 策略容量维度 (20%)
+            w_capacity * model.get('norm_strategy_capacity', 0) +
+            w_cost * model.get('norm_cost_efficiency', 0)
+        )
+        
+        model['golden_rule_score'] = score
+    
+    # 首先将模型分成两组：有有效评分的和有NaN评分的
+    valid_models = []
+    nan_models = []
+    
+    for model in qualified_models:
+        score = model.get('golden_rule_score', 0)
+        if isinstance(score, (int, float)) and not np.isnan(score):
+            valid_models.append(model)
+        else:
+            nan_models.append(model)
+    
+    # 对有效评分的模型进行排序
+    sorted_valid_models = sorted(valid_models, key=lambda x: x.get('golden_rule_score', 0), reverse=True)
+    
+    # 将NaN评分模型放在最后
+    ranked_models = sorted_valid_models + nan_models
+    
+    return ranked_models
+
+def get_best_model_by_golden_rule():
+    """
+    根据黄金法则评估标准获取最佳模型
+    
+    Returns:
+        dict: 最佳模型的信息，包括路径和评分
+    """
+    try:
+        # 加载配置
+        config = get_config()
+        
+        # 加载所有模型指标
+        summary_file = config.get('metrics', 'metrics_summary_file')
+        with open(summary_file, 'r') as f:
+            summary_data = json.load(f)
+            models_data = summary_data.get('models', [])
+        
+        if not models_data:
+            logger.error("没有找到模型数据")
+            return None
+        
+        # 使用黄金法则对模型进行排名
+        ranked_models = rank_models_by_golden_rule(models_data, config)
+        
+        if not ranked_models:
+            logger.error("模型排名为空")
+            return None
+        
+        # 获取最佳模型
+        best_model = ranked_models[0]
+        model_name = best_model.get('model_name', '')
+        model_path = f"btc_rl/models/{model_name}.zip"
+        
+        # 计算维度得分明细
+        dimensions = {
+            "风险回报": (
+                best_model.get('norm_total_return', 0) * config.getfloat('model_selection', 'return_weight', fallback=0.08) +
+                best_model.get('norm_consistency_score', 0) * config.getfloat('model_selection', 'consistency_weight', fallback=0.08) +
+                best_model.get('norm_sharpe_ratio', 0) * config.getfloat('model_selection', 'sharpe_weight', fallback=0.08) +
+                best_model.get('norm_sortino_ratio', 0) * config.getfloat('model_selection', 'sortino_weight', fallback=0.08) +
+                best_model.get('norm_calmar_ratio', 0) * config.getfloat('model_selection', 'calmar_weight', fallback=0.08)
+            ) / 0.4,
+            "回撤控制": (
+                best_model.get('norm_max_drawdown', 0) * config.getfloat('model_selection', 'max_drawdown_weight', fallback=0.10) +
+                best_model.get('norm_max_drawdown_duration', 0) * config.getfloat('model_selection', 'drawdown_duration_weight', fallback=0.10)
+            ) / 0.2,
+            "交易质量": (
+                best_model.get('norm_win_rate', 0) * config.getfloat('model_selection', 'win_rate_weight', fallback=0.05) +
+                best_model.get('norm_profit_loss_ratio', 0) * config.getfloat('model_selection', 'profit_loss_ratio_weight', fallback=0.10) +
+                best_model.get('norm_avg_trade_return', 0) * config.getfloat('model_selection', 'avg_trade_return_weight', fallback=0.05)
+            ) / 0.2,
+            "策略容量": (
+                best_model.get('norm_strategy_capacity', 0) * config.getfloat('model_selection', 'capacity_weight', fallback=0.10) +
+                best_model.get('norm_cost_efficiency', 0) * config.getfloat('model_selection', 'cost_efficiency_weight', fallback=0.10)
+            ) / 0.2
+        }
+        
+        # 读取筛选条件，便于在输出中显示
+        filter_criteria = {
+            "min_return": config.getfloat('model_selection', 'minimum_return', fallback=0.5),
+            "max_drawdown": config.getfloat('model_selection', 'maximum_drawdown', fallback=0.20),
+            "min_sharpe": config.getfloat('model_selection', 'minimum_sharpe', fallback=4.0),
+            "min_win_rate": config.getfloat('model_selection', 'minimum_win_rate', fallback=0.30),
+            "min_profit_loss": config.getfloat('model_selection', 'minimum_profit_loss_ratio', fallback=1.2)
+        }
+        
+        return {
+            "model_name": model_name,
+            "model_path": model_path,
+            "golden_rule_score": best_model.get('golden_rule_score', 0),
+            "total_return": best_model.get('total_return', 0),
+            "max_drawdown": best_model.get('max_drawdown', 0),
+            "filter_criteria": filter_criteria,
+            "sharpe_ratio": best_model.get('sharpe_ratio', 0),
+            "sortino_ratio": best_model.get('sortino_ratio', 0),
+            "win_rate": best_model.get('win_rate', 0),
+            "profit_loss_ratio": best_model.get('profit_loss_ratio', 0),
+            "calmar_ratio": best_model.get('calmar_ratio', 0),
+            "total_fees": best_model.get('total_fees', 0),
+            "final_equity": best_model.get('final_equity', 0),
+            "dimensions": dimensions,
+            "ranked_models": ranked_models  # 返回所有排名模型
+        }
+    except Exception as e:
+        logger.error(f"获取最佳模型时出错: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
+        
+def get_model_metrics_by_name(model_name):
+    """
+    根据模型名称获取模型的指标信息
+    
+    Args:
+        model_name (str): 模型名称，如'sac_ep12'
+        
+    Returns:
+        dict: 模型的详细指标信息，包括路径、评分、交易记录等
+    """
+    try:
+        # 加载配置
+        config = get_config()
+        
+        # 加载所有模型指标
+        summary_file = config.get('metrics', 'metrics_summary_file')
+        with open(summary_file, 'r') as f:
+            summary_data = json.load(f)
+            models_data = summary_data.get('models', [])
+        
+        if not models_data:
+            logger.error("没有找到模型数据")
+            return None
+        
+        # 查找指定的模型
+        target_model = None
+        for model in models_data:
+            if model.get('model_name') == model_name:
+                target_model = model
+                break
+        
+        if not target_model:
+            logger.error(f"未找到模型: {model_name}")
+            return None
+        
+        # 加载模型的详细指标文件
+        try:
+            metrics_file = f"btc_rl/metrics/{model_name}_metrics.json"
+            with open(metrics_file, 'r') as f:
+                detailed_metrics = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.warning(f"无法加载模型 {model_name} 的详细指标: {e}")
+            detailed_metrics = {}
+        
+        model_path = f"btc_rl/models/{model_name}.zip"
+        
+        # 整合基本指标和详细指标
+        result = {
+            "model_name": model_name,
+            "model_path": model_path,
+            "golden_rule_score": target_model.get('golden_rule_score', 0),
+            "total_return": target_model.get('total_return', 0),
+            "max_drawdown": target_model.get('max_drawdown', 0),
+            "sharpe_ratio": target_model.get('sharpe_ratio', 0),
+            "sortino_ratio": target_model.get('sortino_ratio', 0),
+            "win_rate": target_model.get('win_rate', 0),
+            "total_fees": target_model.get('total_fees', 0),
+            "final_equity": target_model.get('final_equity', 0),
+            "symbol": target_model.get('symbol', 'BTC/USDT'),
+            "timeframe": target_model.get('timeframe', '1h'),
+        }
+        
+        # 添加卡玛比率计算，避免最大回撤为0导致的除零问题
+        calmar = target_model.get('calmar_ratio', 0)
+        if calmar == 0 and result['max_drawdown'] > 0:
+            calmar = abs(result['total_return'] / result['max_drawdown'])
+        result['calmar_ratio'] = calmar
+            
+        # 从详细指标中提取或计算盈亏比
+        profit_loss = target_model.get('profit_loss_ratio', 0)
+        result['profit_loss_ratio'] = profit_loss
+        
+        # 添加详细指标
+        if detailed_metrics:
+            # 权益曲线
+            if 'equity_curve' in detailed_metrics:
+                result['equity_curve'] = detailed_metrics['equity_curve']
+            
+            # 回撤数据
+            if 'drawdowns' in detailed_metrics:
+                result['drawdowns'] = detailed_metrics['drawdowns']
+            
+            # 交易记录
+            if 'trades' in detailed_metrics:
+                result['trades'] = detailed_metrics['trades']
+                
+                # 如果盈亏比是0，从交易数据重新计算
+                if result['profit_loss_ratio'] == 0 and result['trades']:
+                    try:
+                        win_profits = [trade.get('profit', 0) for trade in result['trades'] if trade.get('profit', 0) > 0]
+                        loss_profits = [abs(trade.get('profit', 0)) for trade in result['trades'] if trade.get('profit', 0) < 0]
+                        avg_win = sum(win_profits) / len(win_profits) if win_profits else 0
+                        avg_loss = sum(loss_profits) / len(loss_profits) if loss_profits else 0
+                        if avg_loss > 0:
+                            result['profit_loss_ratio'] = avg_win / avg_loss
+                        logger.info(f"已从交易数据重新计算 {model_name} 的盈亏比: {result['profit_loss_ratio']:.2f}")
+                    except Exception as e:
+                        logger.error(f"计算盈亏比失败: {e}")
+            
+            # 如果卡玛比率是0，但有最大回撤数据，重新计算
+            if result['calmar_ratio'] == 0 and result['max_drawdown'] > 0:
+                try:
+                    result['calmar_ratio'] = abs(result['total_return'] / result['max_drawdown'])
+                    logger.info(f"已重新计算 {model_name} 的卡玛比率: {result['calmar_ratio']:.2f}")
+                except Exception as e:
+                    logger.error(f"计算卡玛比率失败: {e}")
+            
+            # 添加其他可能的详细指标
+            for key in ['daily_returns', 'monthly_returns', 'volatility', 'recovery_periods']:
+                if key in detailed_metrics:
+                    result[key] = detailed_metrics[key]
+        
+        return result
+    except Exception as e:
+        logger.error(f"获取模型 {model_name} 指标时出错: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
+
 # WebSocket配置
 WS_HOST = "localhost"
 WS_PORT = 8765
@@ -1123,20 +1801,6 @@ def evaluate_model(model_id: str, is_preloading=True):
     
     # 将统计数据添加到每个历史数据点
     if history_data:
-        for data_point in history_data:
-            data_point["stats"] = stats if stats else {}
-        
-        # 将历史数据保存到全局字典中
-        MODEL_HISTORY[model_id] = history_data
-        
-        # 将计算结果添加到队列中，一次发送最后一个点(包含了统计指标)
-        try:
-            msg_queue.put_nowait(history_data[-1])
-            logger.info(f"已将模型 {model_id} 的最终数据点添加到队列")
-        except queue.Full:
-            logger.warning(f"队列已满，无法添加最终数据点")
-            
-    else:
         logger.error(f"模型 {model_id} 评估后历史数据为空")
         # 如果历史数据为空，添加一个错误数据点
         error_data = {
