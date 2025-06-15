@@ -15,14 +15,39 @@ from pathlib import Path
 
 def setup_logger():
     """设置日志系统"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('trading_system.log')
-        ]
-    )
+    # 确保logs目录存在
+    logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    # 生成包含时间戳的日志文件名
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join(logs_dir, f'trading_{timestamp}.log')
+    
+    # 配置根日志记录器
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # 清除任何现有的处理程序
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # 添加新的处理程序
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # 控制台处理程序
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+    
+    # 文件处理程序
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+    
+    logger = logging.getLogger('TradingSystem')
+    logger.info(f"日志文件已创建: {log_file}")
+    
+    return logger
     return logging.getLogger('TradingSystem')
 
 def parse_arguments():

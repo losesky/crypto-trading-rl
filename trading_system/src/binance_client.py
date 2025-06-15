@@ -505,8 +505,8 @@ class BinanceClient:
             # 构建请求参数
             params = {
                 'symbol': symbol,
-                'timestamp': int(time.time() * 1000) + self.time_offset,
-                'recvWindow': 60000  # 使用较大的接收窗口避免时间同步问题
+                'timestamp': self.get_timestamp(),  # 使用get_timestamp方法确保时间戳正确
+                'recvWindow': 120000  # 使用更大的接收窗口避免时间同步问题
             }
             
             # 添加订单ID或客户端订单ID

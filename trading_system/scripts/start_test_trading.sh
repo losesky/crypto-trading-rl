@@ -39,8 +39,14 @@ export PYTHONPATH=$ROOT_DIR:$PYTHONPATH
 # 启动交易系统
 echo "启动交易系统..."
 cd "$TRADING_SYSTEM_DIR/src"
+
+# 创建备份日志文件（以防main.py中的日志配置有问题）
+BACKUP_LOG="$TRADING_SYSTEM_DIR/logs/trading_$(date +"%Y%m%d_%H%M%S").log"
+echo "日志文件: $BACKUP_LOG"
+
 # 通过直接在src目录中运行main.py解决相对导入问题
-python main.py --config "$CONFIG_FILE" --mode test
+# 同时将所有输出重定向到备份日志文件
+python main.py --config "$CONFIG_FILE" --mode test 2>&1 | tee "$BACKUP_LOG"
 
 echo "交易系统已启动！"
 echo "您可以通过访问 http://localhost:8090 查看交易仪表盘。"

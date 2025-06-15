@@ -3,7 +3,6 @@
 """
 交易服务模块 - 整合所有组件，提供完整的交易服务
 """
-import os
 import sys
 import time
 import logging
@@ -40,8 +39,7 @@ class TradingService:
         参数:
         - config: 配置文件路径或配置字典
         """
-        # 设置日志系统
-        self._setup_logging()
+        # 获取日志记录器
         self.logger = logging.getLogger("TradingService")
         self.logger.info("正在初始化交易服务...")
         
@@ -75,23 +73,6 @@ class TradingService:
         signal.signal(signal.SIGTERM, self._handle_shutdown)
         
         self.logger.info("交易服务初始化完成")
-    
-    def _setup_logging(self):
-        """设置日志系统"""
-        log_dir = Path(__file__).parent.parent / "logs"
-        log_dir.mkdir(exist_ok=True)
-        
-        log_file = log_dir / f"trading_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        
-        # 配置日志格式和级别
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler()
-            ]
-        )
     
     def _load_config(self, config_path):
         """加载配置文件"""

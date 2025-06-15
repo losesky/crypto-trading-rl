@@ -228,7 +228,7 @@ class DataSender:
         if len(self.order_data) > 20:
             self.order_data.pop()
         
-        self._send_data(data_to_send)
+        self._send_data("order_update", data_to_send)
     
     def update_system_status(self, system_status):
         """更新系统状态"""
@@ -251,7 +251,7 @@ class DataSender:
         }
         
         self.system_status = data_to_send
-        self._send_data(data_to_send)
+        self._send_data("status_update", data_to_send)
 
 # 单例模式
 _instance = None
