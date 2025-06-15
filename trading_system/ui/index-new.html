@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RL交易系统 | 加密货币交易仪表盘</title>
+    <!-- 引入Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入Bootstrap图标库 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- 引入自定义样式 -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- 引入Chart.js和相关库 -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@2.3.1/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.0.0/dist/chartjs-adapter-luxon.min.js"></script>
+</head>
+<body class="bg-light">
+    <!-- 通知容器 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container"></div>
+
+    <!-- 主容器 -->
+    <div class="container-fluid">
+        <!-- 顶部导航栏 -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">
+                    <i class="bi bi-currency-bitcoin me-2"></i>
+                    RL交易系统
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarContent">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#dashboard">控制台</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#analytics">分析</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#settings">设置</a>
+                        </li>
+                    </ul>
+                    <div class="d-flex align-items-center">
+                        <div class="connection-status me-3">
+                            <span class="status-indicator" id="ws-status"></span>
+                            <span id="connection-text">WebSocket</span>
+                        </div>
+                        <div class="connection-status me-3">
+                            <span class="status-indicator" id="api-status"></span>
+                            <span id="api-text">API</span>
+                        </div>
+                        <span class="badge bg-warning" id="mode-badge">测试模式</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容区域 -->
+        <div class="content-wrapper py-4 px-3">
+            <div class="row g-4">
+                <!-- 左侧控制面板 -->
+                <div class="col-lg-3">
+                    <!-- 系统控制卡片 -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-gear-fill me-2"></i>系统控制
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-3">
+                                <button class="btn btn-success" id="btn-start" data-action="start_trading">
+                                    <i class="bi bi-play-fill me-2"></i>启动交易
+                                </button>
+                                <button class="btn btn-danger" id="btn-stop" data-action="stop_trading">
+                                    <i class="bi bi-stop-fill me-2"></i>停止交易
+                                </button>
+                                <button class="btn btn-warning" id="btn-pause" data-action="pause_trading">
+                                    <i class="bi bi-pause-fill me-2"></i>暂停交易
+                                </button>
+                                <button class="btn btn-primary" id="btn-resume" data-action="resume_trading">
+                                    <i class="bi bi-skip-forward-fill me-2"></i>恢复交易
+                                </button>
+                                <hr class="my-2">
+                                <button class="btn btn-outline-danger" id="btn-close-position" data-action="close_position">
+                                    <i class="bi bi-x-circle-fill me-2"></i>平仓
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系统状态卡片 -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-info-circle-fill me-2"></i>系统状态
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>状态</span>
+                                    <span class="badge rounded-pill bg-success" id="status-badge">运行中</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>运行时间</span>
+                                    <span id="running-time">00:00:00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>交易次数</span>
+                                    <span id="trading-volume">0</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>最近交易</span>
+                                    <span id="last-trade">-</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 账户信息卡片 -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-wallet-fill me-2"></i>账户信息
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>可用余额</span>
+                                    <span id="available-balance">$0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>保证金余额</span>
+                                    <span id="margin-balance">$0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>今日盈亏</span>
+                                    <span id="today-profit" class="text-success">$0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>总盈亏</span>
+                                    <span id="total-profit" class="text-success">$0.00</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中间图表区域 -->
+                <div class="col-lg-6">
+                    <!-- 价格图表卡片 -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary bg-gradient text-white d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-graph-up me-2"></i>价格图表
+                            </h5>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-light" data-timeframe="5m">5分钟</button>
+                                <button type="button" class="btn btn-sm btn-outline-light active" data-timeframe="1h">1小时</button>
+                                <button type="button" class="btn btn-sm btn-outline-light" data-timeframe="1d">日线</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="position: relative; height: 300px;">
+                                <canvas id="price-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 当前持仓卡片 -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-briefcase-fill me-2"></i>当前持仓
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>方向</th>
+                                            <th>大小</th>
+                                            <th>入场价</th>
+                                            <th>当前价</th>
+                                            <th>未实现盈亏</th>
+                                            <th>ROE</th>
+                                            <th>强平价</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="position-table-body">
+                                        <tr>
+                                            <td colspan="7" class="text-center">当前无持仓</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 最近订单卡片 -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary bg-gradient text-white d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-list-ul me-2"></i>最近订单
+                            </h5>
+                            <button class="btn btn-sm btn-outline-light" id="btn-refresh-orders">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>类型</th>
+                                            <th>数量</th>
+                                            <th>价格</th>
+                                            <th>状态</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="order-table-body">
+                                        <tr>
+                                            <td colspan="5" class="text-center">无最近订单</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧模型预测和警报区域 -->
+                <div class="col-lg-3">
+                    <!-- 模型预测卡片 -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-robot me-2"></i>模型预测
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="position: relative; height: 200px;">
+                                <canvas id="prediction-chart"></canvas>
+                            </div>
+                            <hr>
+                            <h6 class="text-center">等待预测数据...</h6>
+                        </div>
+                    </div>
+
+                    <!-- 持仓详情卡片 -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-info-square-fill me-2"></i>持仓详情
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>持仓规模</span>
+                                    <span id="position-size">0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>方向</span>
+                                    <span id="position-side" class="text-secondary">无持仓</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>入场价</span>
+                                    <span id="entry-price">0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>当前价</span>
+                                    <span id="current-price">0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>未实现盈亏</span>
+                                    <span id="unrealized-pnl" class="text-success">$0.00</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>ROE</span>
+                                    <span id="roe" class="text-success">0.00%</span>
+                                </li>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>杠杆</span>
+                                    <span id="leverage">3x</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 系统警报卡片 -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary bg-gradient text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-bell-fill me-2"></i>系统通知
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>级别</th>
+                                            <th>信息</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="alert-table-body">
+                                        <tr>
+                                            <td colspan="3" class="text-center">无系统警报</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer class="footer mt-auto py-3 bg-dark text-white">
+            <div class="container text-center">
+                <span>RL交易系统 &copy; 2025</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 引入Bootstrap JS和依赖项 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 引入WebSocket管理器 -->
+    <script src="websocket-manager.js"></script>
+    
+    <!-- 引入应用程序JS -->
+    <script src="app-new.js"></script>
+</body>
+</html>

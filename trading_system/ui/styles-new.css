@@ -1,0 +1,329 @@
+/* RL交易系统 - 增强版样式表 */
+:root {
+  /* 主题色 */
+  --primary-color: #0d6efd;
+  --secondary-color: #6c757d;
+  --success-color: #20c997;
+  --danger-color: #dc3545;
+  --warning-color: #ffc107;
+  --info-color: #0dcaf0;
+  --light-color: #f8f9fa;
+  --dark-color: #212529;
+  
+  /* 特殊颜色 */
+  --long-color: #20c997;         /* 多头颜色 */
+  --short-color: #dc3545;        /* 空头颜色 */
+  --positive-pnl: #20c997;       /* 正盈亏颜色 */
+  --negative-pnl: #dc3545;       /* 负盈亏颜色 */
+  
+  /* 暗黑模式颜色 (预留) */
+  --dark-bg: #121212;
+  --dark-card-bg: #1e1e1e;
+  --dark-text: #e0e0e0;
+  --dark-border: #333333;
+}
+
+/* 全局样式 */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f0f2f5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wrapper {
+  flex: 1;
+  padding-bottom: 60px; /* 为固定页脚留出空间 */
+}
+
+/* 卡片样式 */
+.card {
+  border: none;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.08);
+}
+
+.card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.card-header {
+  border-bottom: none;
+  padding: 0.75rem 1.25rem;
+  font-weight: 500;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+/* 图表容器样式 */
+.chart-container {
+  width: 100%;
+  min-height: 250px;
+  position: relative;
+}
+
+/* 状态指示器 */
+.connection-status {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-online {
+  background-color: var(--success-color);
+  box-shadow: 0 0 5px var(--success-color);
+  animation: pulse 2s infinite;
+}
+
+.status-offline {
+  background-color: var(--danger-color);
+}
+
+.status-warning {
+  background-color: var(--warning-color);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 表格样式增强 */
+.table {
+  margin-bottom: 0;
+}
+
+.table > :not(caption) > * > * {
+  padding: 0.5rem;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b8b9be;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6c757d;
+}
+
+/* 按钮样式增强 */
+.btn {
+  border-radius: 0.5rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* 自定义按钮组样式 */
+.btn-group .btn {
+  border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+  border-top-left-radius: 0.5rem;
+  border-bottom-left-radius: 0.5rem;
+}
+
+.btn-group .btn:last-child {
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+/* 徽章样式 */
+.badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+  border-radius: 0.5rem;
+}
+
+/* 列表组样式 */
+.list-group-item {
+  border-left: none;
+  border-right: none;
+  padding: 0.75rem 1.25rem;
+}
+
+.list-group-flush:last-child .list-group-item:last-child {
+  border-bottom: 0;
+}
+
+/* 特殊数据样式 */
+.price-up {
+  color: var(--positive-pnl);
+  animation: fadeIn 0.3s;
+}
+
+.price-down {
+  color: var(--negative-pnl);
+  animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* 加载指示器 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+
+.loading-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.spinner {
+  width: 3rem;
+  height: 3rem;
+  border: 0.25rem solid rgba(13, 110, 253, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Toast通知样式 */
+.toast {
+  border-radius: 0.5rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+}
+
+.toast-container {
+  z-index: 1070;
+}
+
+/* 工具提示样式 */
+.tooltip {
+  font-size: 0.875rem;
+}
+
+/* 移动适配性增强 */
+@media (max-width: 992px) {
+  .card {
+    margin-bottom: 1rem;
+  }
+  
+  .navbar-brand {
+    font-size: 1rem;
+  }
+  
+  .connection-status {
+    font-size: 0.75rem;
+  }
+}
+
+/* 页脚样式 */
+.footer {
+  background-color: var(--dark-color);
+  color: white;
+  padding: 1rem 0;
+  margin-top: auto;
+}
+
+/* 暗黑模式样式 (由JavaScript控制激活) */
+body.dark-mode {
+  background-color: var(--dark-bg);
+  color: var(--dark-text);
+}
+
+body.dark-mode .card {
+  background-color: var(--dark-card-bg);
+  border-color: var(--dark-border);
+}
+
+body.dark-mode .list-group-item {
+  background-color: var(--dark-card-bg);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
+body.dark-mode .table {
+  color: var(--dark-text);
+}
+
+body.dark-mode .table-light th {
+  background-color: #2a2a2a;
+  color: var(--dark-text);
+}
+
+body.dark-mode .text-secondary {
+  color: #a0a0a0 !important;
+}
+
+/* 图表样式增强 */
+.price-line {
+  border-width: 2px;
+}
+
+.prediction-point {
+  border-width: 2px;
+}
+
+.buy-point {
+  background-color: rgba(40, 167, 69, 0.7);
+}
+
+.sell-point {
+  background-color: rgba(220, 53, 69, 0.7);
+}
+
+.hold-point {
+  background-color: rgba(255, 193, 7, 0.7);
+}

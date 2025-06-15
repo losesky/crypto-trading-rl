@@ -116,8 +116,9 @@ show_menu() {
     echo -e "${CYAN}1. 提交代码到GitHub (Push)${NC}"
     echo -e "${CYAN}2. 从GitHub获取代码 (Pull)${NC}"
     echo -e "${CYAN}3. 查看状态和历史${NC}"
+    echo -e "${CYAN}4. 分支管理${NC}"
     echo -e "${CYAN}0. 退出${NC}"
-    echo -e "${YELLOW}请输入选项 [0-3]: ${NC}"
+    echo -e "${YELLOW}请输入选项 [0-4]: ${NC}"
     read -n 1 option
     echo
     return $option
@@ -291,6 +292,284 @@ view_status_history() {
     return 0
 }
 
+# 分支管理功能
+branch_management() {
+    while true; do
+        clear
+        echo -e "${BLUE}===== 分支管理 =====${NC}"
+        
+        # 显示当前分支
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        echo -e "${GREEN}当前分支: ${YELLOW}$current_branch${NC}"
+        echo
+        
+        # 显示本地分支列表
+        echo -e "${YELLOW}本地分支:${NC}"
+        git branch -v
+        echo
+        
+        # 显示远程分支列表
+        echo -e "${YELLOW}远程分支:${NC}"
+        git branch -r
+        echo
+        
+        # 分支管理菜单
+        echo -e "${CYAN}请选择操作:${NC}"
+        echo -e "${CYAN}1. 创建新分支${NC}"
+        echo -e "${CYAN}2. 切换分支${NC}"
+        echo -e "${CYAN}3. 合并分支${NC}"
+        echo -e "${CYAN}4. 删除分支${NC}"
+        echo -e "${CYAN}5. 重命名分支${NC}"
+        echo -e "${CYAN}6. 基于远程分支创建本地分支${NC}"
+        echo -e "${CYAN}0. 返回主菜单${NC}"
+        echo -e "${YELLOW}请输入选项 [0-6]: ${NC}"
+        read -n 1 branch_option
+        echo
+        
+        case $branch_option in
+            1)  # 创建新分支
+                echo -e "${YELLOW}请输入新分支名称:${NC}"
+                read new_branch_name
+                if [ -z "$new_branch_name" ]; then
+                    echo -e "${RED}分支名不能为空${NC}"
+                else
+                    echo -e "${YELLOW}是否切换到新分支? (Y/n)${NC}"
+                    read -n 1 switch_option
+                    echo
+                    if [ "$switch_option" = "n" ] || [ "$switch_option" = "N" ]; then
+                        # 创建但不切换
+                        if git branch $new_branch_name; then
+                            echo -e "${GREEN}成功创建分支: $new_branch_name${NC}"
+                        else
+                            echo -e "${RED}创建分支失败，可能已存在同名分支${NC}"
+                        fi
+                    else
+                        # 创建并切换
+                        if git checkout -b $new_branch_name; then
+                            echo -e "${GREEN}成功创建并切换到分支: $new_branch_name${NC}"
+                        else
+                            echo -e "${RED}创建或切换分支失败${NC}"
+                        fi
+                    fi
+                fi
+                ;;
+                
+            2)  # 切换分支
+                echo -e "${YELLOW}请输入要切换到的分支名称:${NC}"
+                read target_branch
+                if [ -z "$target_branch" ]; then
+                    echo -e "${RED}分支名不能为空${NC}"
+                else
+                    # 检查是否有未提交的更改
+                    if [ -n "$(git status --porcelain)" ]; then
+                        echo -e "${YELLOW}您有未提交的更改，切换分支前需要处理这些更改${NC}"
+                        echo -e "${YELLOW}1. 提交更改后切换${NC}"
+                        echo -e "${YELLOW}2. 存储更改(stash)后切换${NC}"
+                        echo -e "${YELLOW}3. 强制切换(可能丢失更改)${NC}"
+                        echo -e "${YELLOW}0. 取消切换${NC}"
+                        echo -e "${YELLOW}请选择 [0-3]: ${NC}"
+                        read -n 1 switch_handling
+                        echo
+                        
+                        case $switch_handling in
+                            1)  # 提交更改
+                                echo -e "${YELLOW}输入提交信息:${NC}"
+                                read commit_msg
+                                commit_msg="${commit_msg:-自动提交更改 - 切换分支前}"
+                                git add .
+                                git commit -m "$commit_msg"
+                                ;;
+                            2)  # 存储更改
+                                git stash save "切换到分支 $target_branch 前的自动存储"
+                                echo -e "${GREEN}更改已存储${NC}"
+                                ;;
+                            3)  # 强制切换
+                                git reset --hard
+                                echo -e "${GREEN}未提交的更改已丢弃${NC}"
+                                ;;
+                            *)  # 取消
+                                echo -e "${YELLOW}切换分支已取消${NC}"
+                                break
+                                ;;
+                        esac
+                    fi
+                    
+                    # 执行分支切换
+                    if git checkout $target_branch; then
+                        echo -e "${GREEN}成功切换到分支: $target_branch${NC}"
+                        
+                        # 如果之前进行了stash，询问是否要应用
+                        if [ "$switch_handling" = "2" ]; then
+                            echo -e "${YELLOW}是否应用之前存储的更改? (y/N)${NC}"
+                            read -n 1 apply_stash
+                            echo
+                            if [ "$apply_stash" = "y" ] || [ "$apply_stash" = "Y" ]; then
+                                if git stash apply; then
+                                    echo -e "${GREEN}存储的更改已成功应用${NC}"
+                                    echo -e "${YELLOW}是否删除存储记录? (y/N)${NC}"
+                                    read -n 1 drop_stash
+                                    echo
+                                    if [ "$drop_stash" = "y" ] || [ "$drop_stash" = "Y" ]; then
+                                        git stash drop
+                                        echo -e "${GREEN}存储记录已删除${NC}"
+                                    fi
+                                else
+                                    echo -e "${RED}应用存储的更改时出现冲突，请手动解决${NC}"
+                                fi
+                            fi
+                        fi
+                    else
+                        echo -e "${RED}切换分支失败，请检查分支名是否正确${NC}"
+                    fi
+                fi
+                ;;
+                
+            3)  # 合并分支
+                echo -e "${YELLOW}请输入要合并到当前分支的源分支名称:${NC}"
+                read source_branch
+                if [ -z "$source_branch" ]; then
+                    echo -e "${RED}分支名不能为空${NC}"
+                else
+                    echo -e "${YELLOW}正在将 $source_branch 合并到 $current_branch...${NC}"
+                    if git merge $source_branch; then
+                        echo -e "${GREEN}合并成功${NC}"
+                    else
+                        echo -e "${RED}合并时出现冲突，请手动解决冲突${NC}"
+                        echo -e "${YELLOW}解决冲突后，使用以下命令:${NC}"
+                        echo -e "${YELLOW}  git add .${NC}"
+                        echo -e "${YELLOW}  git commit -m \"解决合并冲突\"${NC}"
+                        echo -e "${RED}或者中止合并:${NC}"
+                        echo -e "${YELLOW}  git merge --abort${NC}"
+                    fi
+                fi
+                ;;
+                
+            4)  # 删除分支
+                echo -e "${YELLOW}请输入要删除的分支名称:${NC}"
+                read branch_to_delete
+                if [ -z "$branch_to_delete" ]; then
+                    echo -e "${RED}分支名不能为空${NC}"
+                elif [ "$branch_to_delete" = "$current_branch" ]; then
+                    echo -e "${RED}无法删除当前分支，请先切换到其他分支${NC}"
+                else
+                    echo -e "${YELLOW}是否删除远程分支? (y/N)${NC}"
+                    read -n 1 delete_remote
+                    echo
+                    
+                    # 删除本地分支
+                    echo -e "${YELLOW}删除本地分支 $branch_to_delete...${NC}"
+                    if git branch -d $branch_to_delete; then
+                        echo -e "${GREEN}成功删除本地分支${NC}"
+                    else
+                        echo -e "${RED}删除本地分支失败，该分支可能包含未合并的更改${NC}"
+                        echo -e "${YELLOW}是否强制删除? (y/N)${NC}"
+                        read -n 1 force_delete
+                        echo
+                        if [ "$force_delete" = "y" ] || [ "$force_delete" = "Y" ]; then
+                            if git branch -D $branch_to_delete; then
+                                echo -e "${GREEN}成功强制删除本地分支${NC}"
+                            else
+                                echo -e "${RED}强制删除本地分支失败${NC}"
+                            fi
+                        fi
+                    fi
+                    
+                    # 删除远程分支
+                    if [ "$delete_remote" = "y" ] || [ "$delete_remote" = "Y" ]; then
+                        echo -e "${YELLOW}删除远程分支 $branch_to_delete...${NC}"
+                        if git push origin --delete $branch_to_delete; then
+                            echo -e "${GREEN}成功删除远程分支${NC}"
+                        else
+                            echo -e "${RED}删除远程分支失败${NC}"
+                        fi
+                    fi
+                fi
+                ;;
+                
+            5)  # 重命名分支
+                if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
+                    echo -e "${RED}警告: 您正在尝试重命名主分支，这可能会导致问题${NC}"
+                    echo -e "${YELLOW}是否继续? (y/N)${NC}"
+                    read -n 1 continue_rename
+                    echo
+                    if [ "$continue_rename" != "y" ] && [ "$continue_rename" != "Y" ]; then
+                        echo -e "${YELLOW}已取消重命名操作${NC}"
+                        break
+                    fi
+                fi
+                
+                echo -e "${YELLOW}请输入新的分支名称:${NC}"
+                read new_branch_name
+                if [ -z "$new_branch_name" ]; then
+                    echo -e "${RED}新分支名不能为空${NC}"
+                else
+                    # 重命名本地分支
+                    if git branch -m $new_branch_name; then
+                        echo -e "${GREEN}成功重命名本地分支为: $new_branch_name${NC}"
+                        
+                        # 询问是否处理远程分支
+                        echo -e "${YELLOW}是否更新远程分支? (y/N)${NC}"
+                        read -n 1 update_remote
+                        echo
+                        if [ "$update_remote" = "y" ] || [ "$update_remote" = "Y" ]; then
+                            # 删除旧的远程分支，推送新的分支
+                            echo -e "${YELLOW}删除旧的远程分支并推送新分支...${NC}"
+                            if git push origin :$current_branch && git push -u origin $new_branch_name; then
+                                echo -e "${GREEN}成功更新远程分支${NC}"
+                            else
+                                echo -e "${RED}更新远程分支失败${NC}"
+                                echo -e "${YELLOW}您可能需要手动执行:${NC}"
+                                echo -e "${YELLOW}  git push origin :$current_branch${NC}"
+                                echo -e "${YELLOW}  git push -u origin $new_branch_name${NC}"
+                            fi
+                        fi
+                    else
+                        echo -e "${RED}重命名分支失败${NC}"
+                    fi
+                fi
+                ;;
+                
+            6)  # 基于远程分支创建本地分支
+                echo -e "${YELLOW}获取远程分支信息...${NC}"
+                git fetch
+                
+                echo -e "${YELLOW}可用的远程分支:${NC}"
+                git branch -r
+                echo
+                
+                echo -e "${YELLOW}请输入远程分支名称(不含origin/):${NC}"
+                read remote_branch
+                if [ -z "$remote_branch" ]; then
+                    echo -e "${RED}分支名不能为空${NC}"
+                else
+                    echo -e "${YELLOW}请输入本地分支名称 (默认: $remote_branch):${NC}"
+                    read local_branch
+                    local_branch="${local_branch:-$remote_branch}"
+                    
+                    # 创建并切换到新的本地分支
+                    if git checkout -b $local_branch origin/$remote_branch; then
+                        echo -e "${GREEN}成功创建并切换到本地分支: $local_branch${NC}"
+                    else
+                        echo -e "${RED}创建本地分支失败，请检查远程分支名称是否正确${NC}"
+                    fi
+                fi
+                ;;
+                
+            0)  # 返回主菜单
+                return 0
+                ;;
+                
+            *)
+                echo -e "${RED}无效选项，请重新选择${NC}"
+                ;;
+        esac
+        
+        echo
+        echo -e "${YELLOW}按任意键继续...${NC}"
+        read -n 1
+    done
+}
+
 # 主循环
 while true; do
     show_menu
@@ -305,6 +584,9 @@ while true; do
             ;;
         3)
             view_status_history
+            ;;
+        4)
+            branch_management
             ;;
         0)
             echo -e "${GREEN}感谢使用Git管理脚本，再见!${NC}"

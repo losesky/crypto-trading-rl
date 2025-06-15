@@ -1,0 +1,63 @@
+{
+  "general": {
+    "model_path": "/home/losesky/crypto-trading-rl/btc_rl/models/best_model/sac_ep2_20250611_152637.zip",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "mode": "production",
+    "log_level": "INFO"
+  },
+  "binance": {
+    "api_key": "",
+    "api_secret": "",
+    "test_net": false,
+    "base_url": "https://fapi.binance.com",
+    "ws_url": "wss://fstream.binance.com/ws"
+  },
+  "trading": {
+    "initial_balance": null,
+    "max_leverage": 2,
+    "max_position_size_usd": 1000,
+    "fee_rate": 0.0004,
+    "stop_loss_pct": 0.05,
+    "take_profit_pct": 0.08,
+    "risk_per_trade_pct": 0.01
+  },
+  "system": {
+    "data_update_interval": 60,
+    "position_check_interval": 30,
+    "heartbeat_interval": 60,
+    "error_retry_delay": 5,
+    "max_retries": 3,
+    "save_trading_data": true,
+    "backup_interval_hours": 24
+  },
+  "ui": {
+    "http_port": 8091,
+    "ws_port": 8096,
+    "update_interval": 2000,
+    "max_data_points": 500,
+    "enable_notifications": true,
+    "debug_mode": false
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp_server": "",
+      "smtp_port": 587,
+      "sender_email": "",
+      "receiver_email": "",
+      "username": "",
+      "password": ""
+    },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    }
+  },
+  "security": {
+    "ip_whitelist": [],
+    "require_api_key": true,
+    "session_timeout_minutes": 60
+  }
+}

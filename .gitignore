@@ -28,13 +28,15 @@ ENV/
 
 # TensorBoard logs (optional, depending on your needs)
 btc_rl/logs/
-btc_rl/data/
+
+trading_system/logs/
 
 # Models (optional, depending on your needs)
 btc_rl/models/
 btc_rl/metrics/
 btc_rl/reports/
-model_backups/
+trading_system/data/
+btc_rl/data/
 
 # Data files (you may want to include or exclude these)
 # btc_rl/data/*.npz

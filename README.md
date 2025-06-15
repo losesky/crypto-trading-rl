@@ -39,6 +39,7 @@ btc_rl/
 │   ├── episodes/                 # 训练回合日志
 │   └── tb/                       # TensorBoard日志
 ├── models/                       # 模型保存目录
+│   └── best_model/               # 最佳模型文件夹
 ├── src/                          # 源代码
 │   ├── config.py                 # 配置管理
 │   ├── data_fetcher.py           # 加密货币历史数据获取工具
@@ -47,6 +48,35 @@ btc_rl/
 │   ├── http_server.py            # 静态文件服务器
 │   ├── policies.py               # 策略网络定义
 │   ├── preprocessing.py          # 数据预处理
+trading_system/                   # 自动交易系统目录
+├── config/                       # 配置文件
+│   ├── config_template.json      # 配置模板
+│   ├── prod_config.json          # 生产环境配置
+│   └── test_config.json          # 测试环境配置
+├── data/                         # 交易数据记录
+├── logs/                         # 交易日志
+├── scripts/                      # 脚本工具
+│   ├── install_dependencies.sh   # 安装依赖
+│   ├── setup_service.sh          # 设置系统服务
+│   ├── start_prod_trading.sh     # 启动生产交易
+│   └── start_test_trading.sh     # 启动测试交易
+├── src/                          # 源代码
+│   ├── __init__.py
+│   ├── binance_client.py         # 币安API客户端
+│   ├── data_recorder.py          # 数据记录器
+│   ├── model_wrapper.py          # 模型包装器
+│   ├── order_manager.py          # 订单管理器
+│   ├── position_tracker.py       # 仓位跟踪器
+│   ├── risk_manager.py           # 风险管理器
+│   ├── system_monitor.py         # 系统监控
+│   ├── trading_env.py            # 交易环境
+│   ├── trading_service.py        # 交易服务
+│   └── ui_server.py              # UI服务器
+└── ui/                           # 用户界面
+    ├── index.html                # 主页
+    ├── dashboard.js              # 仪表盘逻辑
+    ├── components.js             # UI组件
+    └── styles.css                # 样式表
 │   ├── train_sac.py              # SAC算法训练脚本
 │   ├── validate_data.py          # 数据质量验证工具
 │   ├── websocket_client.py       # WebSocket客户端
@@ -220,6 +250,105 @@ initial_balance = 10000.0
 max_leverage = 3.0
 fee_rate = 0.0002
 ```
+
+## 🤖 交易系统
+
+我们的项目包含一个自动化交易系统，可以使用训练好的强化学习模型在 Binance U本位合约市场上进行实时交易。
+
+### ✨ 交易系统特点
+
+- 支持 Binance U本位合约测试网和正式环境
+- 使用训练好的最佳强化学习模型实时推断交易决策
+- 完善的风险控制系统，包括最大损失限制、最大回撤控制等
+- 实时监控所有交易活动和系统健康状态
+- 美观直观的用户界面，实时展示交易状态和模型分析
+- 专业的订单管理和仓位追踪系统
+- 全面的数据记录，方便后续分析和策略优化
+
+### 📊 交易系统组件
+
+交易系统包含以下核心组件：
+
+1. **交易服务 (Trading Service)** - 集成所有组件的主服务，负责整体协调
+2. **币安客户端 (Binance Client)** - 负责与币安API交互
+3. **模型包装器 (Model Wrapper)** - 加载并使用训练好的强化学习模型
+4. **交易环境 (Trading Env)** - 连接模型和交易所的桥梁
+5. **订单管理器 (Order Manager)** - 负责创建、跟踪和管理订单
+6. **仓位追踪器 (Position Tracker)** - 跟踪持仓状态和表现
+7. **风险管理器 (Risk Manager)** - 监控和管理交易风险
+8. **系统监控 (System Monitor)** - 监控整个系统的健康状态
+9. **数据记录器 (Data Recorder)** - 记录各种交易和系统数据
+10. **UI服务器 (UI Server)** - 提供Web界面的后端服务
+
+### 🖥️ 用户界面
+
+交易系统提供了专业的Web用户界面，具有以下功能：
+
+- 价格实时图表显示
+- 当前仓位和盈亏状况
+- 模型预测可视化
+- 账户资金和交易历史
+- 系统状态和警报通知
+- 手动控制选项（启动、停止、暂停、平仓等）
+
+### 🚀 如何使用交易系统
+
+#### 1. 安装依赖
+
+```bash
+cd trading_system
+./scripts/install_dependencies.sh
+```
+
+#### 2. 配置系统
+
+复制配置模板并填入API密钥：
+
+```bash
+cp trading_system/config/config_template.json trading_system/config/my_config.json
+```
+
+然后编辑 `my_config.json` 文件，填入您的测试网或正式网 Binance API密钥和密码。
+
+#### 3. 启动测试交易
+
+```bash
+./scripts/start_test_trading.sh my_config.json
+```
+
+#### 4. 启动生产交易
+
+⚠️ **注意：** 生产环境中的交易会使用实际资金，请确保您充分了解风险。
+
+```bash
+./scripts/start_prod_trading.sh my_config.json
+```
+
+#### 5. 访问用户界面
+
+交易系统启动后，通过浏览器访问：
+
+```bash
+http://localhost:8090
+```
+
+### ⚙️ 配置选项
+
+配置文件中的主要选项：
+
+- **general**: 模型路径、交易对、时间框架等基本设置
+- **binance**: API密钥、密码和网络设置
+- **trading**: 交易参数（初始余额、杠杆、止损止盈等）
+- **system**: 系统参数（更新间隔、检查频率等）
+- **ui**: UI服务器相关参数（端口号、更新频率等）
+
+### 🔐 安全建议
+
+- API密钥应只具备交易权限，不要开启提币权限
+- 开始时使用较小的资金测试系统表现
+- 定期检查风险参数，确保符合您的风险承受能力
+- 在初期阶段密切监控系统行为
+- 备份所有交易数据和日志，以便后续分析和改进
 
 ## 🔍 核心功能
 
@@ -421,7 +550,7 @@ function updateCharts(d) {
 3. **训练过程崩溃**
    - 检查GPU内存是否足够
    - 尝试降低批处理大小或网络复杂度
-   
+
 4. **模型比较功能不可用**
    - 检查是否有模型文件(.zip)位于btc_rl/models/目录中
    - 确认两个服务器都成功启动：HTTP(8080)和WebSocket(8765)

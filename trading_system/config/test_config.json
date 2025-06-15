@@ -1,0 +1,39 @@
+{
+  "general": {
+    "model_path": "/home/losesky/crypto-trading-rl/btc_rl/models/best_model/sac_ep2_20250611_152637.zip",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "mode": "test",
+    "log_level": "INFO"
+  },
+  "binance": {
+    "api_key": "a87cdd2a43aaf8ba50884cd6e23fd31d714b1bb6f6de3d6ae69358c37c3883af",
+    "api_secret": "13cd48ebf3634cb5429ff0186f85f0d806c45ba6cf745be8d83f84b7c2b07fb3",
+    "test_net": true,
+    "base_url": "https://testnet.binancefuture.com",
+    "ws_url": "wss://fstream.binancefuture.com/ws"
+  },
+  "trading": {
+    "initial_balance": 10000,
+    "max_leverage": 3,
+    "max_position_size_usd": 10000,
+    "fee_rate": 0.0004,
+    "stop_loss_pct": 0.05,
+    "take_profit_pct": 0.1,
+    "risk_per_trade_pct": 0.05
+  },
+  "system": {
+    "data_update_interval": 60,
+    "position_check_interval": 30,
+    "heartbeat_interval": 30,
+    "error_retry_delay": 5,
+    "max_retries": 3
+  },
+  "ui": {
+    "http_port": 8090,
+    "ws_port": 8095,
+    "update_interval": 1000,
+    "max_data_points": 200,
+    "enable_notifications": true
+  }
+}
