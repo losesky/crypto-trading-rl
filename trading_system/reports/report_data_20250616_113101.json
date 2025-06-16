@@ -1,0 +1,18 @@
+{
+  "total_trades": 4,
+  "avg_profit": 0.0125,
+  "total_return": 0.05,
+  "win_rate": 0.6842105263157895,
+  "profitable_trades": 13,
+  "loss_trades": 6,
+  "avg_holding_time": 3.3333333333333334e-09,
+  "model_version": "sac_ep2_20250611_152637",
+  "trades_count": 19,
+  "total_profit": 525.64,
+  "total_loss": 158.92,
+  "profit_loss_ratio": 1.5265736025866912,
+  "last_updated": "2025-06-15T23:45:00",
+  "risk_per_trade": 0.02,
+  "max_leverage": 3,
+  "compatibility_score": 0.9
+}

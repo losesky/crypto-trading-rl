@@ -1,0 +1,41 @@
+{
+  "data_collection": {
+    "enabled": true,
+    "max_experiences": 10000,
+    "save_interval": 100,
+    "min_experiences_for_update": 1000,
+    "experiences_dir": "trading_system/data/collected_data/experiences",
+    "trades_dir": "trading_system/data/collected_data/trades"
+  },
+  "model_update": {
+    "enabled": true,
+    "check_interval_hours": 24,
+    "minimum_trade_count": 50,
+    "minimum_win_rate": 0.45,
+    "auto_update": true,
+    "backup_models": true,
+    "model_backup_dir": "trading_system/data/model_backups"
+  },
+  "metrics": {
+    "performance_threshold": {
+      "min_sharpe_ratio": 0.8,
+      "min_calmar_ratio": 0.5,
+      "max_drawdown": 0.2,
+      "min_total_return": 0.05
+    },
+    "comparison_metrics": [
+      "sharpe_ratio",
+      "calmar_ratio", 
+      "win_rate",
+      "total_return",
+      "max_drawdown"
+    ],
+    "primary_metric": "golden_rule_score"
+  },
+  "notifications": {
+    "notify_on_update": true,
+    "notify_on_error": true,
+    "email_notifications": false,
+    "webhook_url": ""
+  }
+}

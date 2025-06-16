@@ -4,7 +4,9 @@
     "symbol": "BTCUSDT",
     "timeframe": "1h",
     "mode": "test",
-    "log_level": "INFO"
+    "log_level": "INFO",
+    "data_dir": "/home/losesky/crypto-trading-rl/trading_system/data",
+    "model_update_config": "/home/losesky/crypto-trading-rl/trading_system/config/model_update_config.json"
   },
   "binance": {
     "api_key": "a87cdd2a43aaf8ba50884cd6e23fd31d714b1bb6f6de3d6ae69358c37c3883af",
@@ -17,10 +19,10 @@
     "initial_balance": 10000,
     "max_leverage": 3,
     "max_position_size_usd": 10000,
-    "fee_rate": 0.0004,
+    "fee_rate": 0.0002,
     "stop_loss_pct": 0.05,
     "take_profit_pct": 0.1,
-    "risk_per_trade_pct": 0.05
+    "risk_per_trade_pct": 0.02
   },
   "system": {
     "data_update_interval": 60,

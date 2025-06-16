@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密货币交易系统适应性监控报告</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        
+        .summary-box {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .summary-title {
+            font-size: 1.4em;
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .metrics-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            width: calc(25% - 20px);
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .metric-title {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .metric-change {
+            font-size: 0.9em;
+        }
+        
+        .positive-change {
+            color: #27ae60;
+        }
+        
+        .negative-change {
+            color: #c0392b;
+        }
+        
+        .neutral-change {
+            color: #7f8c8d;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .chart-title {
+            font-size: 1.2em;
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-optimal {
+            background-color: #d5f5e3;
+            color: #27ae60;
+        }
+        
+        .status-good {
+            background-color: #e8f8f5;
+            color: #16a085;
+        }
+        
+        .status-caution {
+            background-color: #fef9e7;
+            color: #f39c12;
+        }
+        
+        .status-warning {
+            background-color: #fadbd8;
+            color: #c0392b;
+        }
+        
+        .recommendations {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .recommendations-title {
+            font-size: 1.2em;
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .recommendation-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .recommendation-item:last-child {
+            border-bottom: none;
+        }
+        
+        .recommendation-priority {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        .priority-high {
+            background-color: #e74c3c;
+        }
+        
+        .priority-medium {
+            background-color: #f39c12;
+        }
+        
+        .priority-low {
+            background-color: #3498db;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .metric-card {
+                width: calc(50% - 20px);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .metric-card {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>加密货币交易系统适应性监控报告</h1>
+        <p>报告生成时间：<span id="report-date">{{REPORT_DATE}}</span></p>
+    </div>
+    
+    <div class="summary-box">
+        <h2 class="summary-title">系统适应性概要</h2>
+        <div class="metrics-container">
+            <div class="metric-card">
+                <div class="metric-title">环境兼容性评分</div>
+                <div class="metric-value">{{COMPATIBILITY_SCORE}}</div>
+                <div class="metric-change {{COMPATIBILITY_CHANGE_CLASS}}">{{COMPATIBILITY_CHANGE}}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">交易胜率</div>
+                <div class="metric-value">{{WIN_RATE}}</div>
+                <div class="metric-change {{WIN_RATE_CHANGE_CLASS}}">{{WIN_RATE_CHANGE}}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">当前市场环境</div>
+                <div class="metric-value">{{MARKET_REGIME}}</div>
+                <div class="metric-change neutral-change">自上次报告以来的变化</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">模型版本</div>
+                <div class="metric-value">{{MODEL_VERSION}}</div>
+                <div class="metric-change neutral-change">{{MODEL_UPDATE_STATUS}}</div>
+            </div>
+        </div>
+        
+        <div class="metrics-container">
+            <div class="metric-card">
+                <div class="metric-title">平均每笔交易收益</div>
+                <div class="metric-value">{{AVG_PROFIT}}</div>
+                <div class="metric-change {{PROFIT_CHANGE_CLASS}}">{{PROFIT_CHANGE}}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">当前风险设置</div>
+                <div class="metric-value">{{RISK_SETTING}}</div>
+                <div class="metric-change {{RISK_CHANGE_CLASS}}">{{RISK_CHANGE}}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">总收益率</div>
+                <div class="metric-value">{{TOTAL_RETURN}}</div>
+                <div class="metric-change {{RETURN_CHANGE_CLASS}}">{{RETURN_CHANGE}}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">预测准确度</div>
+                <div class="metric-value">{{PREDICTION_ACCURACY}}</div>
+                <div class="metric-change {{ACCURACY_CHANGE_CLASS}}">{{ACCURACY_CHANGE}}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="chart-container">
+        <h3 class="chart-title">交易性能与市场环境</h3>
+        <div id="performance-chart" style="height: 300px; width: 100%;">
+            <!-- 这里会通过JavaScript注入图表 -->
+            <img src="{{CHART_URL}}" alt="交易性能图表" style="max-width: 100%; height: auto;">
+        </div>
+    </div>
+    
+    <div class="summary-box">
+        <h2 class="summary-title">适应性指标</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>指标</th>
+                    <th>当前值</th>
+                    <th>上次报告</th>
+                    <th>变化</th>
+                    <th>状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>市场波动率</td>
+                    <td>{{VOLATILITY_CURRENT}}</td>
+                    <td>{{VOLATILITY_PREVIOUS}}</td>
+                    <td class="{{VOLATILITY_CHANGE_CLASS}}">{{VOLATILITY_CHANGE}}</td>
+                    <td><span class="status-badge {{VOLATILITY_STATUS_CLASS}}">{{VOLATILITY_STATUS}}</span></td>
+                </tr>
+                <tr>
+                    <td>趋势强度</td>
+                    <td>{{TREND_CURRENT}}</td>
+                    <td>{{TREND_PREVIOUS}}</td>
+                    <td class="{{TREND_CHANGE_CLASS}}">{{TREND_CHANGE}}</td>
+                    <td><span class="status-badge {{TREND_STATUS_CLASS}}">{{TREND_STATUS}}</span></td>
+                </tr>
+                <tr>
+                    <td>预测-奖励相关性</td>
+                    <td>{{CORRELATION_CURRENT}}</td>
+                    <td>{{CORRELATION_PREVIOUS}}</td>
+                    <td class="{{CORRELATION_CHANGE_CLASS}}">{{CORRELATION_CHANGE}}</td>
+                    <td><span class="status-badge {{CORRELATION_STATUS_CLASS}}">{{CORRELATION_STATUS}}</span></td>
+                </tr>
+                <tr>
+                    <td>平均持仓时间</td>
+                    <td>{{HOLDING_TIME_CURRENT}}</td>
+                    <td>{{HOLDING_TIME_PREVIOUS}}</td>
+                    <td class="{{HOLDING_TIME_CHANGE_CLASS}}">{{HOLDING_TIME_CHANGE}}</td>
+                    <td><span class="status-badge {{HOLDING_TIME_STATUS_CLASS}}">{{HOLDING_TIME_STATUS}}</span></td>
+                </tr>
+                <tr>
+                    <td>错误处理频率</td>
+                    <td>{{ERROR_RATE_CURRENT}}</td>
+                    <td>{{ERROR_RATE_PREVIOUS}}</td>
+                    <td class="{{ERROR_RATE_CHANGE_CLASS}}">{{ERROR_RATE_CHANGE}}</td>
+                    <td><span class="status-badge {{ERROR_RATE_STATUS_CLASS}}">{{ERROR_RATE_STATUS}}</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="recommendations">
+        <h3 class="recommendations-title">系统调整建议</h3>
+        {{RECOMMENDATIONS_CONTENT}}
+    </div>
+    
+    <div class="summary-box">
+        <h2 class="summary-title">最近交易记录</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>时间</th>
+                    <th>方向</th>
+                    <th>收益</th>
+                    <th>持仓时间</th>
+                    <th>市场状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{RECENT_TRADES}}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="footer">
+        <p>自适应交易系统监控报告 | 版本 1.0</p>
+        <p>© {{CURRENT_YEAR}} 加密货币交易项目</p>
+    </div>
+</body>
+</html>
