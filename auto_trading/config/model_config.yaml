@@ -1,0 +1,50 @@
+# 模型配置
+model:
+  # 模型路径设置
+  base_path: "./models/trained_models"
+  best_model_path: "./models/trained_models/best_model"
+  
+  # 模型加载设置
+  load_latest: true
+  model_type: "sac"  # SAC算法模型
+  
+  # 高级模型加载设置
+  advanced_loading:
+    use_custom_extractor: true
+    policy_type: "MlpPolicy"  # 尝试使用MlpPolicy而非CnnPolicy
+    mock_on_failure: false    # 如果加载失败则不使用模拟模型，而是抛出异常 # 模型路径设置
+  base_path: "./models/trained_models"
+  best_model_path: "./models/trained_models/best_model"
+  
+  # 模型加载设置
+  load_latest: true
+  model_type: "sac"  # SAC算法模型
+  
+  # 高级模型加载设置
+  advanced_loading:
+    use_custom_extractor: true  # 启用自定义特征提取器
+    policy_type: "MlpPolicy"  # 保持MlpPolicy
+    mock_on_failure: false  # 如果加载失败则抛出异常
+  
+  # 模型集成设置
+  ensemble:
+    enabled: false # 禁用集成模式，只使用最佳模型
+    method: "weighted_voting"  # voting, weighted_voting, average
+    models: []  # 不使用集成模型
+  
+  # 预测设置
+  prediction:
+    confidence_threshold: 0.65  # 模型置信度阈值
+    holding_period: 12  # 默认持仓时间(小时)
+    cooldown_period: 4  # 交易冷却时间(小时)
+    
+  # 特征设置
+  features:
+    use_technical_indicators: true
+    use_market_sentiment: true
+    lookback_window: 24  # 特征计算的历史窗口大小
+    
+  # 日志和检查点设置
+  checkpoints:
+    save_predictions: true
+    prediction_log_path: "logs/predictions"

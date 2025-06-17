@@ -1,0 +1,138 @@
+# 日志系统配置文件
+version: 1
+
+# 日志记录器配置
+loggers:
+  # 基础日志记录器
+  base:
+    level: "INFO"
+    handlers: ["file", "console"]
+    propagate: false
+  
+  # 交易模块日志记录器
+  trading:
+    level: "INFO"
+    handlers: ["trading_file", "console"]
+    propagate: false
+  
+  # 风控模块日志记录器
+  risk:
+    level: "INFO"
+    handlers: ["risk_file", "console"]
+    propagate: false
+  
+  # 模型模块日志记录器
+  models:
+    level: "INFO"
+    handlers: ["model_file", "console"]
+    propagate: false
+  
+  # 数据模块日志记录器
+  data:
+    level: "INFO"
+    handlers: ["data_file", "console"]
+    propagate: false
+  
+  # 监控模块日志记录器
+  monitor:
+    level: "INFO"
+    handlers: ["monitor_file", "console"]
+    propagate: false
+  
+  # 系统模块日志记录器
+  system:
+    level: "INFO"
+    handlers: ["file", "console"]
+    propagate: false
+
+# 处理器配置
+handlers:
+  # 控制台处理器
+  console:
+    class: "logging.StreamHandler"
+    level: "INFO"
+    formatter: "standard"
+    stream: "ext://sys.stdout"
+  
+  # 主日志文件处理器
+  file:
+    class: "logging.handlers.RotatingFileHandler"
+    level: "INFO"
+    formatter: "detailed"
+    filename: "logs/app.log"
+    maxBytes: 10485760  # 10MB
+    backupCount: 10
+  
+  # 交易日志文件处理器
+  trading_file:
+    class: "logging.handlers.TimedRotatingFileHandler"
+    level: "INFO"
+    formatter: "detailed"
+    filename: "logs/trading.log"
+    when: "midnight"
+    interval: 1
+    backupCount: 30
+  
+  # 风控日志文件处理器
+  risk_file:
+    class: "logging.handlers.TimedRotatingFileHandler"
+    level: "INFO"
+    formatter: "detailed"
+    filename: "logs/risk.log"
+    when: "midnight"
+    interval: 1
+    backupCount: 30
+  
+  # 模型日志文件处理器
+  model_file:
+    class: "logging.handlers.TimedRotatingFileHandler"
+    level: "INFO"
+    formatter: "detailed"
+    filename: "logs/model.log"
+    when: "midnight"
+    interval: 1
+    backupCount: 30
+  
+  # 数据日志文件处理器
+  data_file:
+    class: "logging.handlers.TimedRotatingFileHandler"
+    level: "INFO"
+    formatter: "detailed"
+    filename: "logs/data.log"
+    when: "midnight"
+    interval: 1
+    backupCount: 30
+  
+  # 监控日志文件处理器
+  monitor_file:
+    class: "logging.handlers.TimedRotatingFileHandler"
+    level: "INFO"
+    formatter: "detailed"
+    filename: "logs/monitor.log"
+    when: "midnight"
+    interval: 1
+    backupCount: 30
+  
+  # 错误日志文件处理器
+  error_file:
+    class: "logging.handlers.RotatingFileHandler"
+    level: "ERROR"
+    formatter: "detailed"
+    filename: "logs/error.log"
+    maxBytes: 10485760  # 10MB
+    backupCount: 20
+
+# 格式化器配置
+formatters:
+  # 标准格式化器
+  standard:
+    format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  
+  # 详细格式化器
+  detailed:
+    format: "%(asctime)s [%(levelname)s] %(name)s:%(filename)s:%(lineno)d - %(message)s"
+
+# 根日志记录器配置
+root:
+  level: "INFO"
+  handlers: ["console", "file", "error_file"]

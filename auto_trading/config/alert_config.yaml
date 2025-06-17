@@ -1,0 +1,89 @@
+# 告警系统配置文件
+
+# 全局启用/禁用开关
+enabled: true
+
+# 告警通道配置
+channels:
+  # 电子邮件告警配置
+  email:
+    enabled: false
+    sender: "your_email@example.com"
+    recipients:
+      - "admin@example.com"
+    smtp_server: "smtp.example.com"
+    smtp_port: 587
+    username: "your_email@example.com"
+    password: "your_password"
+  
+  # Telegram 告警配置
+  telegram:
+    enabled: false
+    bot_token: "your_bot_token"
+    chat_id: "your_chat_id"
+  
+  # 日志告警配置（始终可用作备选通道）
+  log:
+    enabled: true
+    level: "WARNING"  # 日志记录的最低级别
+
+# 告警级别定义
+levels:
+  - "INFO"      # 普通信息，如系统启动、关闭等
+  - "WARNING"   # 警告信息，如接近风控阈值
+  - "ALERT"     # 一般告警，如单次交易亏损超过阈值
+  - "CRITICAL"  # 严重告警，如日亏损超过阈值
+  - "EMERGENCY" # 紧急告警，如触发熔断机制
+
+# 告警节流配置，避免短时间内发送过多告警
+throttle:
+  # 每小时最大告警数
+  max_alerts_per_hour: 20
+  # 同级别告警的冷却期（分钟）
+  cooldown_period_minutes: 5
+
+# 告警触发规则
+rules:
+  # 资金风险告警
+  capital_risk:
+    # 单次交易亏损超过账户资金比例
+    trade_loss_ratio: 0.02  # 2%
+    # 日亏损超过账户资金比例
+    daily_loss_ratio: 0.05  # 5%
+    # 最大回撤超过比例
+    max_drawdown_ratio: 0.15  # 15%
+  
+  # 系统风险告警
+  system_risk:
+    # API错误率超过阈值
+    api_error_rate: 0.05  # 5%
+    # 订单执行延迟阈值（毫秒）
+    order_delay_threshold: 1000  # 1秒
+    # 数据延迟阈值（秒）
+    data_delay_threshold: 10  # 10秒
+  
+  # 模型风险告警
+  model_risk:
+    # 模型预测与市场严重偏离
+    prediction_deviation_threshold: 0.3  # 30%
+    # 模型置信度过低阈值
+    confidence_threshold: 0.4  # 40%
+
+# 告警模板配置
+templates:
+  # 交易相关告警模板
+  trade:
+    open_position: "开仓: {symbol} {side} {quantity} @ {price}"
+    close_position: "平仓: {symbol} {side} {quantity} @ {price}, PNL: {pnl}"
+    trade_error: "交易执行失败: {symbol} {side} {quantity}, 错误: {error}"
+  
+  # 风控相关告警模板
+  risk:
+    circuit_breaker: "触发熔断: {reason}, 冷却时间: {cooling_period}分钟"
+    risk_limit: "触发风控限制: {type}, 阈值: {threshold}, 当前值: {value}"
+    
+  # 系统相关告警模板
+  system:
+    api_error: "API错误: {endpoint}, 状态码: {status_code}, 错误信息: {message}"
+    connection_error: "连接错误: {service}, 详情: {message}"
+    system_error: "系统错误: {component}, 详情: {message}"

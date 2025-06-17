@@ -1,0 +1,27 @@
+# 币安API配置
+api:
+  # 替换为你的API密钥和密钥
+  api_key: "a87cdd2a43aaf8ba50884cd6e23fd31d714b1bb6f6de3d6ae69358c37c3883af"
+  api_secret: "13cd48ebf3634cb5429ff0186f85f0d806c45ba6cf745be8d83f84b7c2b07fb3"
+  
+  # 币安U本位合约测试网 - 建议先在测试网环境开发和测试
+  base_url: "https://testnet.binancefuture.com"
+  websocket_url: "wss://fstream.binancefuture.com"
+  
+  # 真实环境地址 - 上线时使用
+  # base_url: "https://fapi.binance.com"
+  # websocket_url: "wss://fstream.binance.com"
+  
+  # API请求设置
+  timeout: 10000  # 请求超时时间(毫秒) - 增加超时时间
+  recv_window: 20000  # 接收窗口(毫秒)，用于API请求时间同步 - 显著增加接收窗口
+  
+  # 请求限制设置
+  rate_limits:
+    orders_per_second: 5
+    orders_per_day: 100
+  
+  # 重试机制
+  retry:
+    max_retries: 3
+    retry_delay: 1000  # 毫秒

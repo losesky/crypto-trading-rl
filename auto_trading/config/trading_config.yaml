@@ -1,0 +1,104 @@
+# 交易系统主配置文件
+# 包含各模块的基本配置和系统级别参数
+
+# 交易基础配置
+trading:
+  # 交易对列表，按优先级排序
+  symbols:
+    - BTCUSDT
+    # - ETHUSDT
+    # - BNBUSDT
+  
+  # 支持的时间周期列表，按优先级排序
+  timeframes:
+    - 1h
+    - 15m
+    - 4h
+    - 1d
+    
+  # 每个时间周期需要获取的历史K线数量
+  # 设置为模型训练时使用的窗口长度(100)加上额外的余量，确保特征计算的一致性
+  history_bars: 150
+  
+  # 订单类型设置
+  order_types:
+    default: MARKET
+    allowed:
+      - MARKET
+      - LIMIT
+      - STOP_LOSS_LIMIT
+      - TAKE_PROFIT_LIMIT
+  
+  # 交易执行配置
+  execution:
+    # 订单超时时间（秒）
+    order_timeout: 30
+    # 是否使用测试模式（不实际下单）
+    test_mode: false
+    # 是否允许部分成交
+    allow_partial_fills: true
+
+# 系统循环间隔配置（秒）
+intervals:
+  # 特征更新间隔 - 5分钟更新一次特征，平衡实时性和资源消耗
+  feature_interval: 300
+  # 模型预测间隔 - 与特征更新同步，避免基于相同数据的重复预测
+  prediction_interval: 300
+  # 交易执行检查间隔 - 每分钟检查一次是否满足交易条件
+  execution_interval: 60
+  # 报告生成间隔
+  report_interval: 3600
+  # 数据保存间隔
+  save_interval: 300
+
+# 系统路径配置
+paths:
+  # 数据存储目录
+  data_dir: "../data"
+  # 日志存储目录
+  logs_dir: "../logs"
+  # 报告存储目录
+  reports_dir: "../reports"
+  # 模型存储目录
+  models_dir: "../models/best_model"
+
+# 监控配置
+monitoring:
+  # 是否启用监控面板
+  dashboard_enabled: true
+  # 是否启用API性能监控
+  api_monitoring: true
+  # 定期检查的性能指标
+  performance_metrics:
+    - cpu_usage
+    - memory_usage
+    - disk_usage
+    - network_latency
+  # 监控数据保留天数
+  data_retention_days: 30
+
+# 警报配置
+alerts:
+  # 警报接收邮箱
+  email: ""
+  # 是否启用Telegram通知
+  telegram_enabled: false
+  # Telegram机器人令牌
+  telegram_token: ""
+  # Telegram聊天ID
+  telegram_chat_id: ""
+  # 警报级别（DEBUG, INFO, WARNING, ERROR, CRITICAL）
+  alert_level: "WARNING"
+
+# 环境配置
+environment:
+  # 运行模式（development, testing, production）
+  mode: "development"
+  # 日志级别
+  log_level: "INFO"
+  # 是否启用详细日志
+  verbose: true
+  # 超时设置（秒）
+  timeout: 300
+  # 重试次数
+  retries: 3

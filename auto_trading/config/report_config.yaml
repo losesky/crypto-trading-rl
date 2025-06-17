@@ -1,0 +1,146 @@
+# 报告系统配置文件
+
+# 报告类型配置
+reports:
+  # 日报配置
+  daily:
+    enabled: true
+    # 是否自动生成
+    auto_generate: true
+    # 生成时间（24小时制）
+    generation_time: "00:05"  # 每天凌晨 00:05 生成前一天的报告
+  
+  # 周报配置
+  weekly:
+    enabled: true
+    auto_generate: true
+    # 生成的星期几（1-7，周一到周日）
+    generation_day: 1  # 周一
+    generation_time: "01:00"  # 每周一凌晨 01:00 生成
+  
+  # 月报配置
+  monthly:
+    enabled: true
+    auto_generate: true
+    # 生成的日期（每月第几天）
+    generation_day: 1  # 每月1号
+    generation_time: "02:00"  # 凌晨 02:00 生成
+
+# 报告格式配置
+formats:
+  # HTML 格式报告配置
+  html:
+    enabled: true
+    template: "trading_report.html"
+    include_charts: true
+  
+  # PDF 格式报告配置（需要安装 wkhtmltopdf）
+  pdf:
+    enabled: false
+    template: "trading_report.html"
+    page_size: "A4"
+  
+  # JSON 格式报告配置
+  json:
+    enabled: true
+    include_raw_data: true
+  
+  # CSV 格式报告配置
+  csv:
+    enabled: true
+    # 是否包含表头
+    include_header: true
+    # 分隔符
+    delimiter: ","
+
+# 报告内容配置
+content:
+  # 资金概览部分
+  capital_overview:
+    enabled: true
+    # 是否显示资产分配
+    show_asset_allocation: true
+    # 是否显示历史余额
+    show_balance_history: true
+  
+  # 交易概览部分
+  trading_overview:
+    enabled: true
+    # 是否显示交易统计
+    show_trade_stats: true
+    # 是否显示持仓统计
+    show_position_stats: true
+  
+  # 性能指标部分
+  performance_metrics:
+    enabled: true
+    # 包含的指标
+    metrics:
+      - "total_pnl"           # 总盈亏
+      - "win_rate"            # 胜率
+      - "avg_profit_per_trade" # 平均每笔交易盈利
+      - "avg_loss_per_trade"  # 平均每笔交易亏损
+      - "profit_loss_ratio"   # 盈亏比
+      - "sharpe_ratio"        # 夏普比率
+      - "sortino_ratio"       # 索提诺比率
+      - "max_drawdown"        # 最大回撤
+      - "max_drawdown_duration" # 最大回撤持续时间
+      - "recovery_factor"     # 恢复因子
+      - "calmar_ratio"        # 卡玛比率
+      - "omega_ratio"         # 欧米伽比率
+  
+  # 图表配置
+  charts:
+    enabled: true
+    # 包含的图表
+    types:
+      - "equity_curve"        # 权益曲线
+      - "drawdown_chart"      # 回撤图
+      - "monthly_returns"     # 月度收益图
+      - "daily_returns_dist"  # 日收益分布图
+      - "trade_pnl_dist"      # 交易盈亏分布图
+      - "win_loss_streak"     # 连续盈亏图
+    # 图表尺寸
+    size:
+      width: 800
+      height: 500
+    # 图表主题
+    theme: "default"  # 可选 default, dark, light
+  
+  # 交易明细部分
+  trade_details:
+    enabled: true
+    # 最大显示交易数量
+    max_trades: 100
+    # 最小交易金额（过滤小额交易）
+    min_trade_amount: 0
+    # 显示的交易字段
+    fields:
+      - "timestamp"   # 交易时间
+      - "symbol"      # 交易对
+      - "side"        # 方向
+      - "price"       # 价格
+      - "quantity"    # 数量
+      - "amount"      # 金额
+      - "pnl"         # 盈亏
+      - "fee"         # 手续费
+
+# 输出目录配置
+output_dir: "reports"
+templates_dir: "templates"
+data_dir: "data"
+
+# 报告分发配置
+distribution:
+  # 电子邮件分发
+  email:
+    enabled: false
+    recipients:
+      - "admin@example.com"
+    subject_template: "{report_type} 交易报告 {start_date} - {end_date}"
+    body_template: "请查看附件中的交易报告。"
+  
+  # 自动打开（仅适用于本地开发环境）
+  auto_open:
+    enabled: false
+    format: "html"  # 自动打开的报告格式

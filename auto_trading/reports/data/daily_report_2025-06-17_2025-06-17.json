@@ -1,0 +1,17 @@
+{
+  "start_date": "2025-06-17",
+  "end_date": "2025-06-17",
+  "generated_time": "2025-06-18 00:15:50",
+  "metrics": {
+    "total_trades": 0,
+    "win_trades": 0,
+    "loss_trades": 0,
+    "win_rate": 0,
+    "total_pnl": 0,
+    "avg_profit_per_trade": 0,
+    "avg_loss_per_trade": 0,
+    "profit_loss_ratio": 0,
+    "max_drawdown": 0,
+    "sharpe_ratio": 0
+  }
+}

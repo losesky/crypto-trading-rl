@@ -1,0 +1,42 @@
+# 风险控制配置
+risk:
+  # 资金安全设置
+  capital:
+    total_capital_limit: 0.5  # 最大使用总资金的50%
+    initial_position_size: 0.02  # 初始仓位大小为总资金的2%
+    max_position_size: 0.1  # 最大仓位大小为总资金的10%
+    
+  # 交易风控
+  trade_limits:
+    max_single_loss: 0.03  # 单次交易最大亏损限制(总资金的3%)
+    max_daily_drawdown: 0.08  # 日最大回撤限制(总资金的8%)
+    min_trade_interval: 3600  # 最小交易间隔(秒)
+    max_daily_trades: 24  # 24小时最大交易次数
+    max_open_positions: 3  # 最大同时持仓数量
+    
+  # 波动率控制
+  volatility:
+    max_acceptable_volatility: 0.05  # 最大可接受波动率
+    volatility_window: 24  # 波动率计算窗口(小时)
+    volatility_scaling: true  # 是否启用波动率缩放
+    
+  # 熔断机制
+  circuit_breaker:
+    enabled: true
+    consecutive_loss_limit: 3  # 连续亏损次数触发熔断
+    loss_percentage_24h: 0.15  # 24小时亏损比例触发熔断(总资金的15%)
+    cooling_period: 24  # 熔断后冷却期(小时)
+    
+  # 仓位管理
+  position_management:
+    max_holding_time: 72  # 最大持仓时间(小时)
+    pyramid_scaling: true  # 是否启用金字塔加仓
+    scale_in_steps: 3  # 加仓步数
+    scale_out_steps: 2  # 减仓步数
+    
+  # 止盈止损设置
+  stop_settings:
+    trailing_stop: true  # 是否启用追踪止损
+    trailing_stop_distance: 0.02  # 追踪止损距离(价格的2%)
+    fixed_stop_loss: 0.03  # 固定止损(仓位的3%)
+    take_profit: 0.05  # 固定止盈(仓位的5%)

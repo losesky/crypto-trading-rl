@@ -29,6 +29,7 @@ ENV/
 # TensorBoard logs (optional, depending on your needs)
 btc_rl/logs/
 btc_rl/data/
+auto_trading/models/trained_models/
 
 # Models (optional, depending on your needs)
 btc_rl/models/

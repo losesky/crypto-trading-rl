@@ -1,0 +1,59 @@
+# 监控系统配置文件
+# 用于配置交易系统的监控组件和参数
+
+monitoring:
+  # 仪表盘配置
+  dashboard:
+    # 更新间隔(秒)
+    update_interval: 5
+    # 历史数据保留长度
+    history_length: 100
+    # 启用通知
+    enable_notifications: true
+    # 数据存储路径
+    data_path: "../logs/dashboard_data.json"
+    # 看板界面配置
+    ui:
+      # 是否在控制台显示状态摘要
+      show_console_summary: true
+      # 是否启用网页界面
+      enable_web_interface: false
+      # 网页界面端口
+      web_port: 8050
+      # 主题 (light/dark)
+      theme: "dark"
+      # 刷新间隔(毫秒)
+      refresh_interval: 5000
+  
+  # 性能监控配置
+  performance:
+    # 是否记录系统资源使用情况
+    monitor_resources: true
+    # CPU使用率报警阈值(%)
+    cpu_alert_threshold: 80
+    # 内存使用率报警阈值(%)
+    memory_alert_threshold: 85
+    # 是否记录模型推理时间
+    monitor_model_inference: true
+  
+  # 数据收集配置
+  data_collection:
+    # 是否启用历史数据收集
+    enable_history: true
+    # 数据收集间隔(秒)
+    collection_interval: 60
+    # 数据保留期限(天)
+    retention_days: 30
+    # 是否压缩历史数据
+    compress_history: true
+  
+  # 报警通知配置
+  notifications:
+    # 是否发送错误通知
+    send_error_notifications: true
+    # 是否发送性能警告
+    send_performance_alerts: true
+    # 是否发送交易通知
+    send_trade_notifications: true
+    # 通知冷却时间(秒)，防止短时间内发送大量通知
+    cooldown_period: 300
