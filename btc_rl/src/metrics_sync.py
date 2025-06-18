@@ -102,6 +102,42 @@ def synchronize_metrics():
             logger.error(f"缺少指标文件且无法评估: {model_name}")
             continue
         
+        # 计算或添加费用数据
+        total_fees = metrics_data.get("total_fees", 0.0)
+        
+        # 首先尝试从历史数据中获取费用 - 这是最准确的来源
+        history_data = metrics_data.get("history", [])
+        if history_data and "total_fee" in history_data[-1]:
+            total_fees = history_data[-1]["total_fee"]
+            logger.info(f"模型 {model_name} 从历史数据获取费用: ${total_fees:.2f}")
+        
+        # 如果费用仍为0，尝试估算费用
+        if total_fees == 0.0:
+            total_trades = metrics_data.get("total_trades", 0)
+            # 如果有交易但没有费用，估算费用
+            if total_trades > 0:
+                # 获取一次交易的平均规模（假设5%的资金）
+                initial_equity = 10000.0
+                final_equity = metrics_data.get("final_equity", 10000.0)
+                avg_equity = (initial_equity + final_equity) / 2
+                avg_trade_size = avg_equity * 0.05
+                
+                # 使用默认费率0.0002计算
+                fee_rate = 0.0002
+                # 每笔交易有两次费用（开仓和平仓）
+                estimated_fees = total_trades * avg_trade_size * fee_rate * 2
+                logger.info(f"模型 {model_name} 没有费用数据，根据 {total_trades} 笔交易估算费用: ${estimated_fees:.2f}")
+                total_fees = estimated_fees
+        
+        # 确保fees是一个合理的数字
+        if not isinstance(total_fees, (int, float)) or total_fees < 0:
+            # 默认费用 = 交易次数 * 平均费用
+            default_fee_per_trade = 0.5  # 每笔交易平均$0.5费用
+            total_fees = metrics_data.get("total_trades", 0) * default_fee_per_trade
+            logger.info(f"模型 {model_name} 使用默认费用: ${total_fees:.2f}")
+        else:
+            logger.info(f"模型 {model_name} 最终计算交易费用: ${total_fees:.2f}")
+        
         # 更新摘要数据
         model_summary = {
             "model_name": model_name,
@@ -113,7 +149,7 @@ def synchronize_metrics():
             "sortino_ratio": metrics_data.get("sortino_ratio", 0.0),
             "total_trades": metrics_data.get("total_trades", 0),
             "win_rate": metrics_data.get("win_rate", 0.0),
-            "total_fees": metrics_data.get("total_fees", 0.0)
+            "total_fees": total_fees
         }
         summary_data["models"].append(model_summary)
     

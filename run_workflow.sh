@@ -581,11 +581,19 @@ if [[ "$analyze_models" == "y" || "$analyze_models" == "Y" ]]; then
     # 获取最低夏普比率和索提诺比率
     MIN_SHARPE_VALUE=$(get_config_value "model_selection" "minimum_sharpe" "5.0")
     MIN_SORTINO_VALUE=$(echo "$MIN_SHARPE_VALUE * 4" | bc) # 通常索提诺比率选择夏普比率的4倍作为基准
-    
+
+    # 确保同步模型指标，特别是总费用数据
+    echo -e "${BLUE}🔄 同步模型指标数据...${NC}"
+    python -m btc_rl.src.metrics_sync
+
     # 运行分析脚本
     echo -e "${BLUE}📊 运行模型分析...${NC}"
     ./analyze_metrics.sh $ANALYZE_OPTIONS --max-dd $MAX_DD_VALUE --min-sharpe $MIN_SHARPE_VALUE --min-sortino $MIN_SORTINO_VALUE
     
+    # 确保同步模型指标，特别是总费用数据
+    echo -e "${BLUE}🔄 同步模型指标数据...${NC}"
+    python -m btc_rl.src.metrics_sync
+
     echo -e "\n${BLUE}🏆 选择最佳模型（黄金法则评分）...${NC}"
     python select_best_model.py
     

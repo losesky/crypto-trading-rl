@@ -114,8 +114,9 @@ class BtcTradingEnv(gym.Env):
         self.ema24 = self.margin_equity
         self.episode_log = []
         self.was_liquidated_this_step = False
-        # cumulative fees paid during the episode
+        # cumulative fees paid during the episode - 确保初始化为0
         self.total_fee_paid = 0.0
+        print(f"[环境] 重置环境，初始化交易费用累计为: ${self.total_fee_paid:.2f}")
 
         # Initialize B&H strategy
         if self.N > 0 and self.prices.size > 0:
@@ -349,12 +350,18 @@ class BtcTradingEnv(gym.Env):
             "price": price,
             "position_btc": self.position_btc, 
             "buy_and_hold_equity": self.buy_and_hold_equity,
-            "total_fee": self.total_fee_paid,
+            "total_fee": self.total_fee_paid,     # 保持一致的key名称
+            "fee_paid": self.total_fee_paid,      # 兼容另一种可能的key名称
+            "step_fee": step_fee_cost,            # 本步骤产生的费用
             "was_liquidated_this_step": self.was_liquidated_this_step,
             "termination_reason": termination_reason,
             "bankrupt": terminated_by_bankruptcy and not terminated_by_liquidation,
             "liquidated": terminated_by_liquidation,
         }
+        
+        # 打印累计费用超过特定阈值或当前步为整百数时的费用信息
+        # if self.total_fee_paid > 10.0 or self.idx % 100 == 0:
+        #     print(f"[环境] 步骤 {self.idx}: 当前累计交易费用: ${self.total_fee_paid:.2f}")
 
         if done:
             self._dump_episode()

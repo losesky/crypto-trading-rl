@@ -205,7 +205,7 @@ def calculate_model_statistics(history_data):
             # 使用极小的阈值来检测仓位变化
             if abs(current_position - prev_position) > 0.00000001:  # 使用更小的阈值以捕获微小变化
                 position_trade_count += 1
-                logger.info(f"检测到position变化交易: 步骤={i}, 之前仓位={prev_position:.8f}, 当前仓位={current_position:.8f}, 变化={current_position-prev_position:.8f}")
+                # logger.info(f"检测到position变化交易: 步骤={i}, 之前仓位={prev_position:.8f}, 当前仓位={current_position:.8f}, 变化={current_position-prev_position:.8f}")
                 trade = {
                     "entry_step": i,
                     "entry_price": history_data[i].get("price", 0),
@@ -384,10 +384,47 @@ def calculate_model_statistics(history_data):
         # 计算总费用
         total_fees = 0.0
         for data_point in history_data:
-            fee = data_point.get("total_fee", 0.0)
-            if isinstance(fee, (int, float)):
-                total_fees += fee
+            # 先尝试获取累计总费用
+            if "total_fee" in data_point:
+                # 如果这是最后一个数据点，直接使用其累计总费用
+                if data_point == history_data[-1]:
+                    total_fees = data_point.get("total_fee", 0.0)
+                    logger.info(f"使用最终累计费用: {total_fees:.2f}")
+                    break
+                # 否则累加每步的费用
+                else:
+                    fee = data_point.get("total_fee", 0.0)
+                    if isinstance(fee, (int, float)):
+                        total_fees += fee
+            # 尝试使用fee_paid字段
+            elif "fee_paid" in data_point:
+                # 如果这是最后一个数据点，直接使用其累计总费用
+                if data_point == history_data[-1]:
+                    total_fees = data_point.get("fee_paid", 0.0)
+                    logger.info(f"使用最终累计费用(fee_paid): {total_fees:.2f}")
+                    break
                 
+        # 处理费用信息
+        # 优先使用历史数据最后一个数据点的费用信息，这是最准确的来源
+        if history_data:
+            last_point = history_data[-1]
+            
+            if "total_fee" in last_point:
+                total_fees = last_point["total_fee"]
+                logger.info(f"使用历史数据最后一步的累计费用(total_fee): {total_fees:.2f}")
+            elif "fee_paid" in last_point:
+                total_fees = last_point["fee_paid"]
+                logger.info(f"使用历史数据最后一步的费用支付(fee_paid): {total_fees:.2f}")
+                
+        # 如果总费用仍为0，但交易次数不为0，根据交易次数估算费用
+        if total_fees == 0 and total_trades > 0:
+            fee_rate = 0.0002  # 根据环境设置的默认费率
+            avg_price = sum(data.get("price", 0) for data in history_data) / len(history_data) if history_data else 0
+            avg_trade_size = 0.05  # 假设平均每笔交易使用5%的资金
+            estimated_fees = total_trades * avg_price * avg_trade_size * fee_rate * 2  # *2因为每笔交易包括开仓和平仓
+            total_fees = estimated_fees
+            logger.info(f"由于总费用为0但交易次数为{total_trades}，估算费用为: {total_fees:.2f}")
+        
         # 打印更详细的信息以便调试
         logger.info(f"交易统计详情: 总交易={total_trades}, 获胜交易={winning_trades}, 胜率={win_rate:.2%}, 总费用={total_fees:.2f}")
         logger.info(f"交易盈亏情况: {[(i, t.get('profit', 0), t.get('is_win', False)) for i, t in enumerate(trades[:5])]}")

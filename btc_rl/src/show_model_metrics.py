@@ -99,6 +99,15 @@ def load_model_metrics(metrics_dir=None):
                     if possible_model_path.exists():
                         data["model_path"] = str(possible_model_path)
                 
+                # 首先检查指标文件中是否已包含费用信息
+                has_fee_data = False
+                if "history" in data and data["history"]:
+                    last_history_point = data["history"][-1]
+                    if "total_fee" in last_history_point and last_history_point["total_fee"] > 0:
+                        data["total_fees"] = last_history_point["total_fee"]
+                        has_fee_data = True
+                        print(f"从历史数据直接获取模型 {model_name} 的交易费用: ${data['total_fees']:.2f}")
+                
                 # 确保交易次数和胜率是一致的：优先使用汇总文件中的数据
                 if summary_data and "models" in summary_data:
                     for model_summary in summary_data["models"]:
@@ -108,10 +117,27 @@ def load_model_metrics(metrics_dir=None):
                                 data["total_trades"] = model_summary["total_trades"]
                             if "win_rate" in model_summary:
                                 data["win_rate"] = model_summary["win_rate"]
-                            if "total_fees" in model_summary:
+                            # 如果汇总文件中有费用数据且本地没有从历史提取，则使用汇总文件中的费用
+                            if "total_fees" in model_summary and (not has_fee_data or model_summary["total_fees"] > 0):
                                 data["total_fees"] = model_summary["total_fees"]
-                            print(f"已同步模型 {model_name} 的交易数据与汇总文件: 交易次数={model_summary.get('total_trades', 0)}, 胜率={model_summary.get('win_rate', 0)*100:.2f}%, 总费用=${model_summary.get('total_fees', 0):.2f}")
+                            print(f"已同步模型 {model_name} 的交易数据与汇总文件: 交易次数={model_summary.get('total_trades', 0)}, 胜率={model_summary.get('win_rate', 0)*100:.2f}%, 总费用=${data.get('total_fees', 0):.2f}")
                             break
+                            
+                # 如果没有费用数据，进行估算
+                if "total_fees" not in data or data.get("total_fees", 0) == 0:
+                    total_trades = data.get("total_trades", 0)
+                    if total_trades > 0:
+                        # 使用标准的费用估算方法
+                        initial_equity = 10000.0
+                        final_equity = data.get("final_equity", 10000.0)
+                        avg_equity = (initial_equity + final_equity) / 2
+                        avg_trade_size = avg_equity * 0.05
+                        fee_rate = 0.0002
+                        estimated_fee = total_trades * avg_trade_size * fee_rate * 2
+                        data["total_fees"] = estimated_fee
+                        print(f"估算模型 {model_name} 的交易费用: ${data['total_fees']:.2f} (基于{total_trades}笔交易)")
+                    else:
+                        data["total_fees"] = 0.0
                 
                 metrics_data.append(data)
         except Exception as e:
@@ -229,13 +255,13 @@ def show_metrics_table(metrics_data, show_full=False, max_dd=0.05, min_sortino=2
                 print(f"推测模型路径: {possible_path}")
             
             # 显示最近的交易历史（如果有）
-            if "history" in data and data["history"]:
-                print("\n最近的交易历史:")
-                for i, point in enumerate(data["history"], 1):
-                    print(f"{i}. 步骤: {point.get('step', 0)}, "
-                          f"价格: {point.get('price', 0):.2f}, "
-                          f"仓位: {point.get('position_btc', 0):.6f}, "
-                          f"权益: {point.get('margin_equity', 0):.2f}")
+            # if "history" in data and data["history"]:
+            #     print("\n最近的交易历史:")
+            #     for i, point in enumerate(data["history"], 1):
+            #         print(f"{i}. 步骤: {point.get('step', 0)}, "
+            #               f"价格: {point.get('price', 0):.2f}, "
+            #               f"仓位: {point.get('position_btc', 0):.6f}, "
+            #               f"权益: {point.get('margin_equity', 0):.2f}")
 
 def plot_metrics(metrics_data):
     """绘制模型指标对比图"""

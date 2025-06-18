@@ -190,8 +190,33 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
                 }
                 history_data.append(data_point)
         
+        # 确保历史数据中包含最终的累计交易费用
+        if history_data and "total_fee" in history_data[-1]:
+            final_total_fee = history_data[-1]["total_fee"]
+            print(f"[评估] 最终累计交易费用: ${final_total_fee:.2f}")
+        else:
+            print("[评估] 警告: 历史数据中未找到最终累计交易费用")
+            
         # 计算模型统计指标
         stats = calculate_model_statistics(history_data)
+        
+        # 确保从环境最后一步获取准确的费用数据
+        if history_data and "total_fee" in history_data[-1]:
+            fees_from_history = history_data[-1]["total_fee"]
+            stats["total_fees"] = fees_from_history
+            print(f"[评估] 从历史数据最后一步获取总费用: ${stats['total_fees']:.2f}")
+        elif stats.get("total_fees", 0) == 0 and stats.get("total_trades", 0) > 0:
+            # 如果没有费用数据但有交易，估算费用
+            total_trades = stats["total_trades"]
+            initial_equity = 10000.0
+            final_equity = stats.get("final_equity", 10000.0)
+            avg_equity = (initial_equity + final_equity) / 2
+            avg_trade_size = avg_equity * 0.05  # 假设每次交易使用5%的资金
+            
+            fee_rate = 0.0002  # 基于环境中的默认费率
+            estimated_fees = total_trades * avg_trade_size * fee_rate * 2  # 每笔交易包括开仓和平仓
+            stats["total_fees"] = estimated_fees
+            print(f"[评估] 估算交易费用: ${stats['total_fees']:.2f} (基于{total_trades}笔交易)")
         
         # 确保胜率和交易次数有效
         if stats["win_rate"] == 0 and stats["total_trades"] > 0:
@@ -247,6 +272,15 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
             drawdowns, max_dd = calculate_drawdowns(equity_curve)
             
             # 准备指标数据
+            # 确保从历史数据提取最后的费用信息
+            final_fee = 0.0
+            if history_data and "total_fee" in history_data[-1]:
+                final_fee = history_data[-1]["total_fee"]
+                print(f"[评估] 从历史数据提取最终费用: ${final_fee:.2f}")
+            elif stats.get("total_fees", 0) > 0:
+                final_fee = stats["total_fees"]
+                print(f"[评估] 使用统计数据中的费用: ${final_fee:.2f}")
+            
             metrics_data = {
                 "model_name": model_name,
                 "model_path": os.path.abspath(model_path),  # 添加绝对路径以便更容易关联
@@ -258,6 +292,7 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
                 "sortino_ratio": float(stats["sortino_ratio"]),
                 "total_trades": int(stats["total_trades"]),
                 "win_rate": float(stats["win_rate"]),
+                "total_fees": float(final_fee),  # 确保包含交易费用信息
                 # 添加新提取的数据
                 "trades": trades,
                 "equity_curve": equity_curve,
@@ -306,7 +341,8 @@ def evaluate_model_with_metrics(model_path, save_metrics=True):
             "sharpe_ratio": 0.0,
             "sortino_ratio": 0.0,
             "total_trades": 0,
-            "win_rate": 0.0
+            "win_rate": 0.0,
+            "total_fees": 0.0
         }
 
 def extract_trades_from_history(history_data):
