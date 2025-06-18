@@ -718,7 +718,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="BTC交易模型多环境回测工具")
-    parser.add_argument("--model", help="指定要回测的模型路径，默认使用黄金法则选出的最佳模型")
+    parser.add_argument("--model", help="指定要回测的模型文件名（不含路径），默认使用黄金法则选出的最佳模型")
+    parser.add_argument("--model-path", help="指定要回测的模型完整路径，优先级高于--model参数")
     parser.add_argument("--start-date", help="回测起始日期 (格式: YYYY-MM-DD)")
     parser.add_argument("--end-date", help="回测结束日期 (格式: YYYY-MM-DD)")
     parser.add_argument("--exchange", default="binance", help="指定获取数据的交易所 (默认: binance)")
@@ -728,12 +729,48 @@ def main():
     args = parser.parse_args()
     
     try:
+        # 确定使用哪个模型路径
+        model_path = None
+        
+        # 优先使用 --model-path 参数
+        if args.model_path:
+            if os.path.exists(args.model_path):
+                model_path = args.model_path
+                logger.info(f"使用指定的完整模型路径: {model_path}")
+            else:
+                logger.error(f"指定的模型路径不存在: {args.model_path}")
+                return 1
+        # 其次使用 --model 参数
+        elif args.model:
+            # 尝试直接使用模型名称（可能已包含路径）
+            if os.path.exists(args.model):
+                model_path = args.model
+                logger.info(f"使用模型文件: {model_path}")
+            # 尝试在标准位置查找模型
+            elif os.path.exists(f"btc_rl/models/{args.model}.zip"):
+                model_path = f"btc_rl/models/{args.model}.zip"
+                logger.info(f"在标准位置找到模型: {model_path}")
+            else:
+                logger.error(f"无法找到模型文件: {args.model}")
+                return 1
+        # 最后使用黄金法则选出的最佳模型
+        else:
+            model_path = get_best_model()
+            if not model_path:
+                logger.error("无法获取最佳模型，请手动指定模型路径")
+                return 1
+        
+        # 验证模型文件是否存在
+        if not os.path.isfile(model_path):
+            logger.error(f"模型文件不存在: {model_path}")
+            return 1
+        
         # 检查是否指定了日期范围
         if args.start_date and args.end_date:
             # 使用指定的日期范围进行回测
             logger.info(f"使用指定的时间段进行回测: {args.start_date} 至 {args.end_date}")
             results = backtest_model_in_timeframe(
-                args.model, 
+                model_path, 
                 args.start_date, 
                 args.end_date,
                 exchange=args.exchange,
@@ -744,7 +781,7 @@ def main():
         else:
             # 执行标准的多环境回测
             logger.info("未指定日期范围，进行标准多环境回测")
-            results = run_multi_environment_backtest(args.model)
+            results = run_multi_environment_backtest(model_path)
         
         if not results:
             logger.error("没有获取到有效的回测结果")

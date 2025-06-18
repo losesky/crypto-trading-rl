@@ -590,28 +590,81 @@ if [[ "$analyze_models" == "y" || "$analyze_models" == "Y" ]]; then
     python select_best_model.py
     
     # 存储最佳模型信息
-    BEST_MODEL_INFO=$(python -c "
+    # 创建一个临时Python脚本来获取模型信息，更可靠地控制输出
+    TMP_SCRIPT=$(mktemp)
+    cat > $TMP_SCRIPT << 'EOF'
 import json
-from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+import sys
+import os
+
+# 禁止所有输出直到我们准备好获取模型信息
+class SuppressOutput:
+    def __enter__(self):
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        return self
+    
+    def __exit__(self, *args):
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
+
+# 在抑制所有输出的上下文中导入模块
+with SuppressOutput():
+    from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+
+# 获取模型信息并仅输出所需的名称和路径
 model_info = get_best_model_by_golden_rule()
 if model_info:
-    print(model_info['model_name'])
-    print(model_info['model_path'])
-")
+    print(model_info['model_name'])  # 第一行输出模型名称
+    print(model_info['model_path'])  # 第二行输出模型路径
+EOF
     
+    # 执行临时脚本并捕获输出
+    BEST_MODEL_INFO=$(python $TMP_SCRIPT 2>/dev/null)
+    
+    # 删除临时脚本
+    rm -f $TMP_SCRIPT
+    
+    # 使用命令替换和管道来分离输出，确保提取出正确的模型名称和路径
     BEST_MODEL_NAME=$(echo "$BEST_MODEL_INFO" | head -1)
     BEST_MODEL_PATH=$(echo "$BEST_MODEL_INFO" | tail -1)
     
-    if [ -n "$BEST_MODEL_NAME" ] && [ -n "$BEST_MODEL_PATH" ] && [ -f "$BEST_MODEL_PATH" ]; then
-        echo -e "${GREEN}✅ 最佳模型: $BEST_MODEL_NAME${NC}"
-        echo -e "${GREEN}✅ 模型路径: $BEST_MODEL_PATH${NC}"
+    # 清理模型名称和路径，移除可能的换行符和其他不必要字符
+    MODEL_NAME_CLEAN=$(echo "$BEST_MODEL_NAME" | tr -d '\n' | tr -d '\r')
+    MODEL_PATH_CLEAN=$(echo "$BEST_MODEL_PATH" | tr -d '\n' | tr -d '\r')
+    
+    # 检查模型是否正确提取
+    if [ -z "$MODEL_NAME_CLEAN" ] || [ "$MODEL_NAME_CLEAN" != "$BEST_MODEL_NAME" ]; then
+        echo -e "${YELLOW}⚠️ 模型名称可能包含不必要的字符，已清理${NC}"
+    fi
+    
+    # 验证模型文件是否存在
+    if [ -n "$MODEL_NAME_CLEAN" ] && [ -n "$MODEL_PATH_CLEAN" ] && [ -f "$MODEL_PATH_CLEAN" ]; then
+        echo -e "${GREEN}✅ 最佳模型: $MODEL_NAME_CLEAN${NC}"
+        echo -e "${GREEN}✅ 模型路径: $MODEL_PATH_CLEAN${NC}"
         
         # 询问是否要备份最佳模型
         read -p "是否要备份最佳模型? (y/n): " backup_model
         if [[ "$backup_model" == "y" || "$backup_model" == "Y" ]]; then
             BACKUP_DIR="$WORKSPACE/btc_rl/models/best_model"
             BACKUP_DATE=$(date +"%Y%m%d_%H%M%S")
-            BACKUP_PATH="$BACKUP_DIR/${BEST_MODEL_NAME}_${BACKUP_DATE}.zip"
+            # 使用模型的实际名称而不是可能包含调试输出的字符串
+            # 确保使用已清理的模型名称
+            if [ -z "$MODEL_NAME_CLEAN" ]; then
+                MODEL_NAME_CLEAN=$(echo "$BEST_MODEL_NAME" | tr -d '\n' | tr -d '\r')
+            fi
+            
+            # 检查模型名称是否有效
+            if [[ ! "$MODEL_NAME_CLEAN" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+                echo -e "${YELLOW}⚠️ 模型名称包含非法字符，使用默认名称'best_model'${NC}"
+                MODEL_NAME_CLEAN="best_model"
+            fi
+            
+            BACKUP_PATH="$BACKUP_DIR/${MODEL_NAME_CLEAN}_${BACKUP_DATE}.zip"
             
             # 确保备份目录存在
             mkdir -p "$BACKUP_DIR"
@@ -625,7 +678,32 @@ if model_info:
         read -p "是否要回测最佳模型性能? (y/n): " backtest_model
         if [[ "$backtest_model" == "y" || "$backtest_model" == "Y" ]]; then
             echo -e "${YELLOW}🧪 开始回测最佳模型...${NC}"
-            ./backtest_best_model.sh --model "$BEST_MODEL_NAME" --full --report
+            # 使用清理过的模型名称进行回测，确保使用实际存在的模型文件
+            if [ -n "$MODEL_PATH_CLEAN" ] && [ -f "$MODEL_PATH_CLEAN" ]; then
+                # 如果模型路径有效且文件存在，直接使用模型路径
+                echo -e "${GREEN}✓ 使用模型路径进行回测: $MODEL_PATH_CLEAN${NC}"
+                ./backtest_best_model.sh --model-path "$MODEL_PATH_CLEAN" --full --report
+            elif [ -n "$MODEL_NAME_CLEAN" ] && [ -f "btc_rl/models/${MODEL_NAME_CLEAN}.zip" ]; then
+                # 如果模型名称有效且对应的文件存在，使用模型名称
+                echo -e "${GREEN}✓ 使用模型名称进行回测: $MODEL_NAME_CLEAN${NC}"
+                ./backtest_best_model.sh --model "$MODEL_NAME_CLEAN" --full --report
+            else
+                # 如果以上方法均失败，尝试使用模型名称手动构建路径
+                echo -e "${YELLOW}⚠️ 警告：无法直接使用模型名称或路径，尝试备选方案${NC}"
+                
+                # 列出可用的模型文件
+                echo -e "${YELLOW}可用的模型文件:${NC}"
+                ls -la btc_rl/models/*.zip
+                
+                # 询问用户选择模型
+                read -p "请输入要使用的模型名称（不带.zip扩展名）: " USER_MODEL_NAME
+                if [ -n "$USER_MODEL_NAME" ] && [ -f "btc_rl/models/${USER_MODEL_NAME}.zip" ]; then
+                    echo -e "${GREEN}✓ 使用用户选择的模型: $USER_MODEL_NAME${NC}"
+                    ./backtest_best_model.sh --model "$USER_MODEL_NAME" --full --report
+                else
+                    echo -e "${RED}❌ 无法找到有效的模型，回测失败${NC}"
+                fi
+            fi
             echo -e "${GREEN}✅ 回测完成!${NC}"
         fi
     else
@@ -657,13 +735,39 @@ echo -e "${BLUE}================================================================
 
 # 打印流程总结
 if [ -n "$BEST_MODEL_NAME" ] && [ -n "$BEST_MODEL_PATH" ] && [ -f "$BEST_MODEL_PATH" ]; then
-    echo -e "📊 ${YELLOW}最佳交易模型:${NC} $BEST_MODEL_NAME"
+    # 确保使用干净的模型名称
+    MODEL_NAME_CLEAN=${MODEL_NAME_CLEAN:-$(echo "$BEST_MODEL_NAME" | tr -d '\n' | tr -d '\r')}
+    echo -e "📊 ${YELLOW}最佳交易模型:${NC} $MODEL_NAME_CLEAN"
     echo -e "📂 ${YELLOW}模型文件位置:${NC} $BEST_MODEL_PATH"
     
     # 调用Python脚本获取模型关键指标
-    MODEL_METRICS=$(python -c "
+    # 创建临时Python脚本来获取模型指标
+    TMP_METRIC_SCRIPT=$(mktemp)
+    cat > $TMP_METRIC_SCRIPT << 'EOF'
 import json
-from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+import sys
+import os
+
+# 禁止所有输出直到我们准备好获取模型信息
+class SuppressOutput:
+    def __enter__(self):
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        return self
+    
+    def __exit__(self, *args):
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
+
+# 在抑制所有输出的上下文中导入模块
+with SuppressOutput():
+    from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+
+# 获取模型信息并输出指标的JSON
 model_info = get_best_model_by_golden_rule()
 if model_info:
     metrics = {
@@ -675,7 +779,13 @@ if model_info:
         'equity': model_info.get('final_equity', 0)
     }
     print(json.dumps(metrics))
-")
+EOF
+    
+    # 执行临时脚本并捕获输出
+    MODEL_METRICS=$(python $TMP_METRIC_SCRIPT 2>/dev/null)
+    
+    # 删除临时脚本
+    rm -f $TMP_METRIC_SCRIPT
     
     if [ -n "$MODEL_METRICS" ]; then
         # 解析模型指标

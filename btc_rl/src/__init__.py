@@ -16,19 +16,19 @@ try:
     # 检查policies模块是否有TimeSeriesCNN属性
     if hasattr(policies, 'TimeSeriesCNN'):
         from .policies import TimeSeriesCNN
-        print(f"从.policies导入了TimeSeriesCNN类")
+        # print(f"从.policies导入了TimeSeriesCNN类")
     else:
-        print(f"警告: policies模块中没有TimeSeriesCNN类")
+        # print(f"警告: policies模块中没有TimeSeriesCNN类")
         # 尝试动态加载TimeSeriesCNN类
         import os
         import importlib.util
-        
+       
         # 确定policies.py的路径
         current_dir = os.path.dirname(os.path.abspath(__file__))
         policies_path = os.path.join(current_dir, 'policies.py')
         
         if os.path.exists(policies_path):
-            print(f"找到policies.py文件，尝试加载TimeSeriesCNN类")
+            # print(f"找到policies.py文件，尝试加载TimeSeriesCNN类")
             
             # 尝试从文件中加载TimeSeriesCNN类
             try:
@@ -46,7 +46,7 @@ try:
                 # 获取TimeSeriesCNN类
                 if hasattr(policies_module, 'TimeSeriesCNN'):
                     TimeSeriesCNN = policies_module.TimeSeriesCNN
-                    print(f"成功从文件加载TimeSeriesCNN类")
+                    # print(f"成功从文件加载TimeSeriesCNN类")
                     
                     # 将类添加到当前模块
                     policies.TimeSeriesCNN = TimeSeriesCNN
@@ -64,7 +64,7 @@ try:
     # 注册TimeSeriesCNN类到全局命名空间，确保pickle可以反序列化
     if 'TimeSeriesCNN' in globals() and 'btc_rl.src.policies' in sys.modules:
         sys.modules['btc_rl.src.policies'].TimeSeriesCNN = globals()['TimeSeriesCNN']
-        print("已将TimeSeriesCNN类注册到btc_rl.src.policies模块")
+        # print("已将TimeSeriesCNN类注册到btc_rl.src.policies模块")
 except ImportError as e:
     print(f"btc_rl.src模块导入错误: {e}")
     pass

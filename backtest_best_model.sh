@@ -42,6 +42,13 @@ while [[ $# -gt 0 ]]; do
             fi
             shift 2
             ;;
+        --model-path)
+            # 直接指定完整的模型文件路径
+            MODEL_PATH=$2
+            # 从路径中提取文件名（不带扩展名）
+            MODEL_NAME=$(basename "$MODEL_PATH" .zip)
+            shift 2
+            ;;
         --start-date)
             START_DATE=$2
             shift 2
@@ -139,7 +146,14 @@ fi
 # 构建命令行参数
 CMD_ARGS=""
 if [ ! -z "$MODEL_PATH" ]; then
-    CMD_ARGS="$CMD_ARGS --model \"$MODEL_PATH\""
+    # 检查是否是直接指定了完整路径还是只是模型名称
+    if [[ "$MODEL_PATH" == *"/"* ]]; then
+        # 指定了完整路径
+        CMD_ARGS="$CMD_ARGS --model-path \"$MODEL_PATH\""
+    else
+        # 只指定了模型名称
+        CMD_ARGS="$CMD_ARGS --model \"$MODEL_PATH\""
+    fi
     echo "使用指定模型: $MODEL_PATH"
 else
     echo "使用黄金法则选出的最佳模型"
@@ -208,13 +222,43 @@ if [ $EXIT_CODE -eq 0 ] && [ $GENERATE_REPORT -eq 1 ]; then
     
     # 确定模型名称
     if [ -z "$MODEL_NAME" ]; then
-        MODEL_NAME=$(python -c "
+        # 创建临时Python脚本来获取最佳模型名称
+        TMP_SCRIPT=$(mktemp)
+        cat > $TMP_SCRIPT << 'EOF'
 import json
-from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+import sys
+import os
+
+# 禁止所有输出直到我们准备好获取模型信息
+class SuppressOutput:
+    def __enter__(self):
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        sys.stdout = open(os.devnull, 'w')
+        sys.stderr = open(os.devnull, 'w')
+        return self
+    
+    def __exit__(self, *args):
+        sys.stdout.close()
+        sys.stderr.close()
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
+
+# 在抑制所有输出的上下文中导入模块
+with SuppressOutput():
+    from btc_rl.src.model_comparison import get_best_model_by_golden_rule
+
+# 获取模型信息并仅输出名称
 model_info = get_best_model_by_golden_rule()
 if model_info:
     print(model_info['model_name'])
-")
+EOF
+        
+        # 执行临时脚本并捕获输出
+        MODEL_NAME=$(python $TMP_SCRIPT 2>/dev/null)
+        
+        # 删除临时脚本
+        rm -f $TMP_SCRIPT
     fi
     
     # 生成报告名称

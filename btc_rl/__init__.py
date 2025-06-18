@@ -5,6 +5,10 @@ btc_rl 模块初始化文件
 import sys
 import os
 
+# 配置GPU内存使用和TensorFlow日志级别
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=INFO, 1=WARNING, 2=ERROR, 3=FATAL
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'  # 动态分配GPU内存，避免占用全部GPU内存
+
 # 确保src目录在路径中
 src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
 if src_path not in sys.path:
@@ -24,8 +28,9 @@ try:
     # 确保可以从btc_rl直接访问TimeSeriesCNN
     __all__ = ['TimeSeriesCNN', 'policies', 'env', 'config']
     
-    # 输出导入成功信息
-    print(f"成功导入btc_rl模块及TimeSeriesCNN类")
+    # 使用日志记录导入成功信息，而不是直接打印
+    import logging
+    logging.getLogger("btc_rl").debug("成功导入btc_rl模块及TimeSeriesCNN类")
 except ImportError as e:
     print(f"警告：btc_rl模块导入错误: {e}")
     
@@ -72,6 +77,7 @@ except ImportError as e:
         # 将类添加到policies模块
         if 'policies' in sys.modules and hasattr(sys.modules['btc_rl.src'], 'policies'):
             sys.modules['btc_rl.src.policies'].TimeSeriesCNN = TimeSeriesCNN
-            print("已创建TimeSeriesCNN类并添加到policies模块")
+            import logging
+            logging.getLogger("btc_rl").debug("已创建TimeSeriesCNN类并添加到policies模块")
     except Exception as inner_e:
         print(f"无法创建TimeSeriesCNN类: {inner_e}")
